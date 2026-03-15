@@ -16,9 +16,14 @@ type healthResponse struct {
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	bunExists := util.CommandExists("bun")
 	nodeExists := util.CommandExists("node")
+	status := "DOWN"
+
+	if bunExists && nodeExists {
+		status = "OK"
+	}
 
 	if err := json.NewEncoder(w).Encode(healthResponse{
-		Status:        "OK",
+		Status:        status,
 		BunAvailable:  bunExists,
 		NodeAvailable: nodeExists,
 	}); err != nil {
