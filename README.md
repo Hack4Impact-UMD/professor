@@ -4,16 +4,24 @@ Worker for the [Hack4Impact-UMD App Portal](apply.umd.hack4impact.org) assessmen
 
 ## Local Development
 
-With Docker installed and alive, build with:
+Build locally with:
 
 ```bash
-docker build -t professor .
+make build
+```
+
+The resulting binary will be `professor`.
+
+With Docker installed and alive, build the image with:
+
+```bash
+make docker-build
 ```
 
 Then run with:
 
-```
-docker run --rm -p 8080:8080 -e PORT=8080 professor
+```bash
+make docker-run
 ```
 
 And now `http://localhost::8080` on your machine should be live!
