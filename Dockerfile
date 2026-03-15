@@ -25,10 +25,14 @@ RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "/root/
 ENV FNM_PATH="/root/.fnm"
 ENV PATH="$FNM_PATH:$PATH"
 
-RUN eval "$(fnm env)" && fnm install v24
+RUN eval "$(fnm env)" && fnm install v24 && fnm default v24
+
+ENV PATH="/root/.fnm/aliases/default/bin:$PATH"
 
 # install bun (for faster package management)
 RUN curl -fsSL https://bun.sh/install | bash
+
+ENV PATH="/root/.bun/bin:$PATH"
 
 WORKDIR /app
 
