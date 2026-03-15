@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 go build -mod=readonly -v -o server .
 
 # start runtime stage with Ubuntu Noble
 # adds ca-certificates for HTTPS; copies node and bun from official images
-FROM ubuntu:noble
+FROM debian:trixie-slim
 
 RUN set -x && apt-get update && apt-get install -y \
     --no-install-recommends \
