@@ -1,9 +1,11 @@
 package serve
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 )
 
 // get an available port
@@ -19,18 +21,25 @@ func GetFreePort() (int, error) {
 	return port, nil
 }
 
-func ServeAssessment(distDir string) (int, error) {
+func ServeAssessment(distDir string) (int, func(), error) {
 	port, err := GetFreePort()
 
 	if err != nil {
-		return -1, err
+		return -1, func() {}, err
 	}
 
-	server := http.NewServeMux()
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: http.FileServer(http.Dir(distDir)),
+	}
 
-	server.Handle("/", http.FileServer(http.Dir(distDir)))
+	go server.ListenAndServe()
 
-	http.ListenAndServe(fmt.Sprintf(":%d", port), server)
+	stop := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(ctx)
+	}
 
-	return port, nil
+	return port, stop, nil
 }
