@@ -13,17 +13,30 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -mod=readonly -v -o server .
 
-# start runtime stage with Ubuntu Noble
-# adds ca-certificates for HTTPS; copies node and bun from official images
+# start runtime stage
+# adds ca-certificates for HTTPS; git for cloning repos;
+# copies node, npm/npx, and bun from official images;
+# pre-installs Playwright Chromium and its OS dependencies
 FROM debian:trixie-slim
 
 RUN set -x && apt-get update && apt-get install -y \
     --no-install-recommends \
-    ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=node-source /usr/local/bin/node /usr/local/bin/node
-COPY --from=bun-source  /usr/local/bin/bun  /usr/local/bin/bun
+COPY --from=node-source /usr/local/bin/node  /usr/local/bin/node
+COPY --from=node-source /usr/local/lib/      /usr/local/lib/
+COPY --from=bun-source  /usr/local/bin/bun   /usr/local/bin/bun
+
+# recreate npm/npx as symlinks so Node resolves require() paths relative
+# to the real file in node_modules, not /usr/local/bin/
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+
+# pre-install Playwright Chromium and all required OS dependencies
+RUN npx playwright install --with-deps chromium \
+    && npm cache clean --force
 
 WORKDIR /app
 

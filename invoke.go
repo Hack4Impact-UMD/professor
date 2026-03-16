@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/Hack4Impact-UMD/professor/middleware"
 	"github.com/Hack4Impact-UMD/professor/routes/health"
 	"log"
 	"net/http"
@@ -20,7 +19,7 @@ func main() {
 
 	server := http.Server{
 		Addr:    ":" + port,
-		Handler: middleware.JsonResponse(handler),
+		Handler: handler,
 	}
 
 	log.Printf("Listening on port %s", port)
