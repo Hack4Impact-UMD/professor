@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/Hack4Impact-UMD/professor/firebase"
+	"github.com/Hack4Impact-UMD/professor/routes/grade"
 	"github.com/Hack4Impact-UMD/professor/routes/health"
 	"github.com/joho/godotenv"
 )
@@ -20,8 +22,21 @@ func main() {
 		log.Printf("Defaulting to port %s", port)
 	}
 
+	app, err := firebase.GetFirebaseApp(os.Getenv("DEV") == "true")
+	if err != nil {
+		log.Fatalf("Could not init firebase app: %v", err)
+		return
+	}
+
+	fsClient, err := firebase.GetFirestoreClient(app)
+	if err != nil {
+		log.Fatalf("Could not get firestore client instance: %v", err)
+		return
+	}
+
 	handler := http.NewServeMux()
 	health.RegisterRoutes(handler)
+	grade.RegisterHandlers(handler, fsClient)
 
 	server := http.Server{
 		Addr:    ":" + port,
