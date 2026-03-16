@@ -8,95 +8,72 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func TestCloneRepo(t *testing.T) {
-	err := godotenv.Load("../.env.test")
-
-	if err != nil {
+func loadTestEnv(t *testing.T) {
+	t.Helper()
+	if err := godotenv.Load("../.env.test"); err != nil {
 		log.Fatal("Could not load test env!")
+	}
+}
+
+func TestCloneRepo(t *testing.T) {
+	loadTestEnv(t)
+
+	repo := "Hack4Impact-UMD/professor"
+	dest := t.TempDir()
+
+	if err := CloneRepo(repo, dest, ""); err != nil {
+		t.Error("Error when cloning:", err)
 		return
 	}
 
-	t.Run("should clone the repo in the dest directory", func(t *testing.T) {
-		repo := "Hack4Impact-UMD/professor"
-		dest := t.TempDir()
+	files, err := os.ReadDir(dest)
+	if err != nil {
+		t.Error("Error when reading dest dir:", err)
+	} else if len(files) <= 0 {
+		t.Error("Dest dir is empty")
+	}
+}
 
-		t.Cleanup(func() {
-			os.RemoveAll(dest)
-		})
+func TestCloneRepoPrivateWithPAT(t *testing.T) {
+	loadTestEnv(t)
 
-		if err := CloneRepo(repo, dest, ""); err != nil {
-			t.Error("Error when cloning:", err)
-			t.Fail()
-			return
-		}
+	repo := "rk234/RamyKaddouri-h4i-assessment-Spring25"
+	dest := t.TempDir()
 
-		files, err := os.ReadDir(dest)
+	if err := CloneRepo(repo, dest, os.Getenv("GITHUB_PAT")); err != nil {
+		t.Error("Error when cloning:", err)
+		return
+	}
 
-		if err != nil {
-			t.Error("Error when reading dest dir:", err)
-			t.Fail()
-			return
-		} else if len(files) <= 0 {
-			t.Error("Dest dir is empty")
-			t.Fail()
-			return
-		}
-	})
+	files, err := os.ReadDir(dest)
+	if err != nil {
+		t.Error("Error when reading dest dir:", err)
+	} else if len(files) <= 0 {
+		t.Error("Dest dir is empty")
+	}
+}
 
-	t.Run("should clone private repo with PAT in the dest directory", func(t *testing.T) {
-		repo := "rk234/RamyKaddouri-h4i-assessment-Spring25"
-		dest := t.TempDir()
+func TestCloneRepoPrivateWithBadPAT(t *testing.T) {
+	loadTestEnv(t)
 
-		t.Cleanup(func() {
-			os.RemoveAll(dest)
-		})
+	repo := "rk234/RamyKaddouri-h4i-assessment-Spring25"
+	dest := t.TempDir()
 
-		if err := CloneRepo(repo, dest, os.Getenv("GITHUB_PAT")); err != nil {
-			t.Error("Error when cloning:", err)
-			t.Fail()
-			return
-		}
+	if err := CloneRepo(repo, dest, "abc:abc"); err != nil {
+		return
+	}
 
-		files, err := os.ReadDir(dest)
+	t.Error("expected error when cloning private repo with bad PAT")
+}
 
-		if err != nil {
-			t.Error("Error when reading dest dir:", err)
-			t.Fail()
-			return
-		} else if len(files) <= 0 {
-			t.Error("Dest dir is empty")
-			t.Fail()
-			return
-		}
-	})
+func TestCloneRepoBadPath(t *testing.T) {
+	loadTestEnv(t)
 
-	t.Run("should error when cloning private repo with bad PAT", func(t *testing.T) {
-		repo := "rk234/RamyKaddouri-h4i-assessment-Spring25"
-		dest := t.TempDir()
+	dest := t.TempDir()
 
-		t.Cleanup(func() {
-			os.RemoveAll(dest)
-		})
+	if err := CloneRepo("", dest, ""); err != nil {
+		return
+	}
 
-		if err := CloneRepo(repo, dest, "abc:abc"); err != nil {
-			return
-		}
-
-		t.Fail()
-	})
-
-	t.Run("should error when cloning bad repo path", func(t *testing.T) {
-		repo := ""
-		dest := t.TempDir()
-
-		t.Cleanup(func() {
-			os.RemoveAll(dest)
-		})
-
-		if err := CloneRepo(repo, dest, ""); err != nil {
-			return
-		}
-
-		t.Fail()
-	})
+	t.Error("expected error when cloning with empty repo path")
 }
