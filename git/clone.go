@@ -7,7 +7,7 @@ import (
 
 func githubRepoUrl(repoPath string, pat string) string {
 	if pat != "" {
-		return "https://" + pat + "@://github.com/" + repoPath + ".git"
+		return "https://" + pat + "@github.com/" + repoPath + ".git"
 	} else {
 		return "https://github.com/" + repoPath + ".git"
 	}

@@ -1,3 +1,5 @@
 # default build name
 professor
 .DS_Store
+.env
+.env.*
