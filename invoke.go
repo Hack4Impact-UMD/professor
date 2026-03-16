@@ -1,13 +1,19 @@
 package main
 
 import (
-	"github.com/Hack4Impact-UMD/professor/routes/health"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/Hack4Impact-UMD/professor/routes/health"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("warn: could not load .env")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
