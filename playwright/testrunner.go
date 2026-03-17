@@ -55,7 +55,7 @@ type ndjsonEvent struct {
 	DurationMs int64    `json:"durationMs"`
 }
 
-func RunPlaywrightTests(jobId string, testDir string, reporter grade.GradingJobReporter) error {
+func RunPlaywrightTests(jobId string, testDir string, baseURL string, reporter grade.GradingJobReporter) error {
 	reporterFile, err := os.CreateTemp("", "pw-reporter-*.ts")
 	if err != nil {
 		reporter.OnTestingStart(jobId, nil, err)
@@ -71,7 +71,7 @@ func RunPlaywrightTests(jobId string, testDir string, reporter grade.GradingJobR
 
 	cmd := exec.Command("npx", "playwright", "test", "--reporter="+reporterFile.Name())
 	cmd.Dir = testDir
-	cmd.Env = sandboxedEnv()
+	cmd.Env = append(sandboxedEnv(), "BASE_URL="+baseURL)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
