@@ -5,11 +5,12 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/Hack4Impact-UMD/professor/routes/grade"
+	"github.com/Hack4Impact-UMD/professor/util"
 )
 
 var safeEnvPrefixes = []string{
@@ -55,7 +56,7 @@ type ndjsonEvent struct {
 	DurationMs int64    `json:"durationMs"`
 }
 
-func RunPlaywrightTests(jobId string, testDir string, baseURL string, reporter grade.GradingJobReporter) error {
+func RunPlaywrightTests(jobId string, testDir string, port int, reporter util.GradingJobReporter) error {
 	reporterFile, err := os.CreateTemp("", "pw-reporter-*.ts")
 	if err != nil {
 		reporter.OnTestingStart(jobId, nil, err)
@@ -71,7 +72,7 @@ func RunPlaywrightTests(jobId string, testDir string, baseURL string, reporter g
 
 	cmd := exec.Command("npx", "playwright", "test", "--reporter="+reporterFile.Name())
 	cmd.Dir = testDir
-	cmd.Env = append(sandboxedEnv(), "BASE_URL="+baseURL)
+	cmd.Env = append(sandboxedEnv(), fmt.Sprintf("BASE_URL=http://localhost:%v", port))
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

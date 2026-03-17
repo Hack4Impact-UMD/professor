@@ -7,7 +7,9 @@ import (
 
 	"github.com/Hack4Impact-UMD/professor/builder"
 	"github.com/Hack4Impact-UMD/professor/git"
+	"github.com/Hack4Impact-UMD/professor/playwright"
 	"github.com/Hack4Impact-UMD/professor/serve"
+	"github.com/Hack4Impact-UMD/professor/util"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -49,7 +51,7 @@ func cloneRepos(jobId string, assessmentRepoURL string, testRepoURL string) (clo
 	}, nil
 }
 
-func RunGradingJob(jobId string, assessmentRepoURL string, testRepoURL string, reporter GradingJobReporter) error {
+func RunGradingJob(jobId string, assessmentRepoURL string, testRepoURL string, reporter util.GradingJobReporter) error {
 	log.Println("Running grading job", jobId)
 	reporter.OnGradeStart(jobId)
 
@@ -91,6 +93,13 @@ func RunGradingJob(jobId string, assessmentRepoURL string, testRepoURL string, r
 		log.Fatalf("Serve failed on port %d: %v", port, err)
 		return err
 	}
+
+	if err := playwright.RunPlaywrightTests(jobId, clone.TestDir, port, reporter); err != nil {
+		log.Fatalf("Failed to run playwright tests %v", port)
+		return err
+	}
+
+	log.Printf("Tests run successfully for job %v", jobId)
 
 	return nil
 }

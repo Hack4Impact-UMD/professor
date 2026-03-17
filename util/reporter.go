@@ -1,4 +1,4 @@
-package grade
+package util
 
 import (
 	"cloud.google.com/go/firestore"

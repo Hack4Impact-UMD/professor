@@ -1,7 +1,6 @@
 package playwright
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,15 +93,13 @@ func TestRunPlaywrightTests(t *testing.T) {
 	defer stop()
 	time.Sleep(50 * time.Millisecond) // let the server bind
 
-	baseURL := fmt.Sprintf("http://localhost:%d", port)
-
 	testDir, err := filepath.Abs("reporter")
 	if err != nil {
 		t.Fatalf("could not resolve reporter dir: %v", err)
 	}
 
 	rep := &mockReporter{}
-	if err := RunPlaywrightTests("test-job", testDir, baseURL, rep); err != nil {
+	if err := RunPlaywrightTests("test-job", testDir, port, rep); err != nil {
 		t.Fatalf("RunPlaywrightTests() error = %v", err)
 	}
 
