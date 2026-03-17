@@ -29,6 +29,8 @@ func main() {
 	}
 
 	fsClient, err := firebase.GetFirestoreClient(app)
+	defer fsClient.Close()
+
 	if err != nil {
 		log.Fatalf("Could not get firestore client instance: %v", err)
 		return

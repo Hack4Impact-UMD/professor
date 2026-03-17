@@ -2,43 +2,17 @@ package playwright
 
 import (
 	"bufio"
+	"context"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
-	"strings"
+	"time"
 
 	"github.com/Hack4Impact-UMD/professor/util"
 )
-
-var safeEnvPrefixes = []string{
-	"PATH=",
-	"HOME=",
-	"TMPDIR=",
-	"TEMP=",
-	"TMP=",
-	"USER=",
-	"LANG=",
-	"LC_",
-	"NODE_",
-	"npm_",
-	"PLAYWRIGHT_",
-}
-
-func sandboxedEnv() []string {
-	var filtered []string
-	for _, kv := range os.Environ() {
-		for _, prefix := range safeEnvPrefixes {
-			if strings.HasPrefix(kv, prefix) {
-				filtered = append(filtered, kv)
-				break
-			}
-		}
-	}
-	return filtered
-}
 
 //go:embed reporter/reporter.ts
 var reporterTS []byte
@@ -70,9 +44,12 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter util.Gr
 	}
 	reporterFile.Close()
 
-	cmd := exec.Command("npx", "playwright", "test", "--reporter="+reporterFile.Name())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "npx", "playwright", "test", "--reporter="+reporterFile.Name())
 	cmd.Dir = testDir
-	cmd.Env = append(sandboxedEnv(), fmt.Sprintf("BASE_URL=http://localhost:%v", port))
+	cmd.Env = append(util.SandboxedEnv(), fmt.Sprintf("BASE_URL=http://localhost:%v", port))
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -86,6 +63,8 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter util.Gr
 	}
 
 	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 64*1024), 10*1024*1024)
+	endRecieved := false
 	for scanner.Scan() {
 		var event ndjsonEvent
 		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
@@ -110,13 +89,21 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter util.Gr
 				nil,
 			)
 		case "end":
-			reporter.OnTestingEnd(jobId)
+			{
+				endRecieved = true
+				reporter.OnTestingEnd(jobId, nil)
+			}
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		log.Printf("Scanner error when reading playwright output: %v", err)
+		reporter.OnTestingEnd(jobId, err)
+		return err
+	}
+
 	if err := cmd.Wait(); err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
+		if !endRecieved {
 			return err
 		}
 	}

@@ -70,7 +70,7 @@ func RunGradingJob(jobId string, assessmentRepoURL string, testRepoURL string, r
 	log.Printf("install output: %v", installOut)
 
 	if err != nil {
-		log.Fatalf("Install failed: %v", err)
+		log.Printf("Install failed: %v", err)
 		return err
 	}
 
@@ -80,22 +80,22 @@ func RunGradingJob(jobId string, assessmentRepoURL string, testRepoURL string, r
 
 	log.Printf("build output: %v", buildOut)
 	if err != nil {
-		log.Fatalf("Build failed: %v", err)
+		log.Printf("Build failed: %v", err)
 		return err
 	}
 
 	port, stop, err := serve.ServeAssessment(filepath.Join(clone.AssessmentDir, "dist"))
-	defer stop()
-
 	reporter.OnServe(jobId, err)
 
 	if err != nil {
-		log.Fatalf("Serve failed on port %d: %v", port, err)
+		log.Printf("Serve failed on port %d: %v", port, err)
 		return err
 	}
 
+	defer stop()
+
 	if err := playwright.RunPlaywrightTests(jobId, clone.TestDir, port, reporter); err != nil {
-		log.Fatalf("Failed to run playwright tests %v", port)
+		log.Printf("Failed to run playwright tests %v", err)
 		return err
 	}
 

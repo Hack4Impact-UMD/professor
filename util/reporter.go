@@ -16,7 +16,7 @@ type GradingJobReporter interface {
 	OnTestingStart(jobId string, suites []string, err error)
 	OnTestStart(jobId string, suite string, testName string)
 	OnTestEnd(jobId string, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, err error)
-	OnTestingEnd(jobId string)
+	OnTestingEnd(jobId string, err error)
 }
 
 type FirestoreReporter struct {

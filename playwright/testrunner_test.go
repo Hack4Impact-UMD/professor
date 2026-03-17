@@ -1,6 +1,8 @@
 package playwright
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,7 +48,7 @@ func (r *mockReporter) OnInstallEnd(jobId, out string, err error) { r.record("On
 func (r *mockReporter) OnBuildStart(jobId string)                 { r.record("OnBuildStart") }
 func (r *mockReporter) OnBuildEnd(jobId, out string, err error)   { r.record("OnBuildEnd") }
 func (r *mockReporter) OnServe(jobId string, err error)           { r.record("OnServe") }
-func (r *mockReporter) OnTestingEnd(jobId string)                 { r.record("OnTestingEnd") }
+func (r *mockReporter) OnTestingEnd(jobId string, err error)      { r.record("OnTestingEnd") }
 func (r *mockReporter) OnTestStart(jobId, suite, testName string) {
 	r.record("OnTestStart:" + suite + "/" + testName)
 }
@@ -91,7 +93,19 @@ func TestRunPlaywrightTests(t *testing.T) {
 		t.Fatalf("failed to start server: %v", err)
 	}
 	defer stop()
-	time.Sleep(50 * time.Millisecond) // let the server bind
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if time.Now().After(deadline) {
+			t.Fatal("server did not become ready in time")
+		}
+		conn, dialErr := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 100*time.Millisecond)
+		if dialErr == nil {
+			_ = conn.Close()
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
 
 	testDir, err := filepath.Abs("reporter")
 	if err != nil {

@@ -12,7 +12,7 @@ func GetFirestoreClient(app *firebase.App) (*firestore.Client, error) {
 	client, err := app.Firestore(context.Background())
 
 	if err != nil {
-		log.Fatalln("Faild to get firestore client instance:", err)
+		log.Println("Faild to get firestore client instance:", err)
 		return nil, err
 	}
 
