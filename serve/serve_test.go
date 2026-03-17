@@ -55,7 +55,7 @@ func TestServeAssessment(t *testing.T) {
 	// Give server time to start
 	time.Sleep(50 * time.Millisecond)
 
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/index.html", port))
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/", port))
 	if err != nil {
 		t.Fatalf("GET request failed: %v", err)
 	}

@@ -10,7 +10,7 @@ help:
 
 build: ## Build the Go application natively
 	@echo "Building Go application..."
-	CGO_ENABLED=0 go build -o $(BINARY_NAME)
+	go build -o $(BINARY_NAME)
 
 test: ## Run unit tests
 	@echo "Running tests..."

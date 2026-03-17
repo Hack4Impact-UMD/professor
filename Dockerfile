@@ -11,7 +11,7 @@ RUN go mod download
 
 # copy and build code
 COPY . .
-RUN CGO_ENABLED=0 go build -mod=readonly -v -o server .
+RUN go build -mod=readonly -v -o server .
 
 # start runtime stage
 # adds ca-certificates for HTTPS; git for cloning repos;

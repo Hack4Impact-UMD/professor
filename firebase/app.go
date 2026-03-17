@@ -17,7 +17,11 @@ func GetFirebaseApp(useEmulators bool) (*firebase.App, error) {
 		os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:8080")
 	}
 
-	app, err := firebase.NewApp(context.Background(), nil, opt)
+	cfg := firebase.Config{
+		ProjectID: os.Getenv("PROJECT_ID"),
+	}
+
+	app, err := firebase.NewApp(context.Background(), &cfg, opt)
 	if err != nil {
 		log.Fatalf("Failed to init firebase app: %v", err)
 		return &firebase.App{}, err
