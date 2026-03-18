@@ -41,6 +41,7 @@ func cloneRepos(jobId string, assessmentRepoURL string, testRepoURL string) (clo
 	})
 
 	if err := wg.Wait(); err != nil {
+		os.RemoveAll(gradingDir)
 		return cloneResult{}, err
 	}
 
