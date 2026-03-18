@@ -1,7 +1,9 @@
 package git
 
 import (
+	"errors"
 	"log"
+	"net/url"
 	"os/exec"
 )
 
@@ -15,6 +17,16 @@ func githubRepoUrl(repoPath string, pat string) string {
 
 func CloneRepo(repoPath string, dest string, pat string) error {
 	repo := githubRepoUrl(repoPath, pat)
+
+	url, err := url.Parse(repo)
+
+	if err != nil {
+		return err
+	}
+
+	if url.Host != "github.com" {
+		return errors.New("repo URL host name must be github.com")
+	}
 
 	log.Printf("cloning %s to %s", repo, dest)
 

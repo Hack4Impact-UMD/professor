@@ -5,8 +5,23 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 )
+
+type spaFS struct {
+	fs http.FileSystem
+}
+
+func (s spaFS) Open(name string) (http.File, error) {
+	f, err := s.fs.Open(name)
+
+	if os.IsNotExist(err) {
+		return s.fs.Open("index.html")
+	}
+
+	return f, err
+}
 
 // get an available port
 func GetFreePort() (int, error) {
@@ -30,7 +45,7 @@ func ServeAssessment(distDir string) (int, func(), error) {
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: http.FileServer(http.Dir(distDir)),
+		Handler: http.FileServer(spaFS{http.Dir(distDir)}),
 	}
 
 	go server.ListenAndServe()

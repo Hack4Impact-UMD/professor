@@ -10,7 +10,7 @@ help:
 
 build: ## Build the Go application natively
 	@echo "Building Go application..."
-	CGO_ENABLED=0 go build -o $(BINARY_NAME)
+	go build -o $(BINARY_NAME)
 
 test: ## Run unit tests
 	@echo "Running tests..."
@@ -23,7 +23,7 @@ docker-build: build ## Build the Docker image
 
 docker-run: docker-build ## Build and run the Docker container
 	@echo "Running Docker container..."
-	docker run --rm -p 8080:8080 --name $(PROJECT_NAME)-container $(DOCKER_IMAGE):$(VERSION)
+	docker run --rm -p 8000:8000 --name $(PROJECT_NAME)-container $(DOCKER_IMAGE):$(VERSION)
 
 clean: ## Clean up build artifacts
 	@echo "Cleaning up..."

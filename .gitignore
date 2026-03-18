@@ -3,3 +3,7 @@ professor
 .DS_Store
 .env
 .env.*
+
+node_modules
+playwright-report
+test-results

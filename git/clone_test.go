@@ -37,6 +37,11 @@ func TestCloneRepo(t *testing.T) {
 func TestCloneRepoPrivateWithPAT(t *testing.T) {
 	loadTestEnv(t)
 
+	if os.Getenv("GITHUB_PAT") == "" {
+		t.Skip("No GITHUB_PAT found in env")
+		return
+	}
+
 	repo := "rk234/RamyKaddouri-h4i-assessment-Spring25"
 	dest := t.TempDir()
 
