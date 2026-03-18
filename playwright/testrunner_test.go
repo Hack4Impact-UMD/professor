@@ -1,8 +1,6 @@
 package playwright
 
 import (
-	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Hack4Impact-UMD/professor/serve"
+	"github.com/Hack4Impact-UMD/professor/util"
 )
 
 const testIndexHTML = `<!DOCTYPE html>
@@ -94,17 +93,8 @@ func TestRunPlaywrightTests(t *testing.T) {
 	}
 	defer stop()
 
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		if time.Now().After(deadline) {
-			t.Fatal("server did not become ready in time")
-		}
-		conn, dialErr := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 100*time.Millisecond)
-		if dialErr == nil {
-			_ = conn.Close()
-			break
-		}
-		time.Sleep(25 * time.Millisecond)
+	if err := util.WaitForPort(port, 5*time.Second); err != nil {
+		t.Fatalf("file server did not respond: %v", err)
 	}
 
 	testDir, err := filepath.Abs("reporter")

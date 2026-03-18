@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Hack4Impact-UMD/professor/builder"
 	"github.com/Hack4Impact-UMD/professor/git"
@@ -86,14 +87,22 @@ func RunGradingJob(jobId string, assessmentRepoURL string, testRepoURL string, r
 	}
 
 	port, stop, err := serve.ServeAssessment(filepath.Join(clone.AssessmentDir, "dist"))
-	reporter.OnServe(jobId, err)
 
 	if err != nil {
+		reporter.OnServe(jobId, err)
 		log.Printf("Serve failed on port %d: %v", port, err)
 		return err
 	}
 
 	defer stop()
+
+	if err := util.WaitForPort(port, 5*time.Second); err != nil {
+		reporter.OnServe(jobId, err)
+		log.Printf("File server did not respond in 5 seconds!")
+		return err
+	}
+
+	reporter.OnServe(jobId, nil)
 
 	if err := playwright.RunPlaywrightTests(jobId, clone.TestDir, port, reporter); err != nil {
 		log.Printf("Failed to run playwright tests %v", err)
