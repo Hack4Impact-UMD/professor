@@ -2,6 +2,14 @@
 
 Worker for the [Hack4Impact-UMD App Portal](apply.umd.hack4impact.org) assessment autograder.
 
+## Tech Stack
+
+- **Language**: Go
+- **Runtime**: Bun
+- **Testing**: Playwright
+- **Database**: Firestore
+- **Deployment**: Docker, Google Cloud Run
+
 ## Local Development
 
 Build locally with:
