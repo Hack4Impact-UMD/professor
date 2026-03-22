@@ -23,7 +23,7 @@ docker-build: build ## Build the Docker image
 
 docker-run: docker-build ## Build and run the Docker container
 	@echo "Running Docker container..."
-	docker run --rm -p 8000:8000 --name $(PROJECT_NAME)-container $(DOCKER_IMAGE):$(VERSION)
+	docker run --rm -p 8000:8000 --env-file ./.env --name $(PROJECT_NAME)-container $(DOCKER_IMAGE):$(VERSION)
 
 clean: ## Clean up build artifacts
 	@echo "Cleaning up..."
