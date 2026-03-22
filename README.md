@@ -5,7 +5,8 @@ Worker for the [Hack4Impact-UMD App Portal](apply.umd.hack4impact.org) assessmen
 ## Tech Stack
 
 - **Language**: Go
-- **Runtime**: Bun
+- **Runtime**: Node
+- **Package Manager**: Bun
 - **Testing**: Playwright
 - **Database**: Firestore
 - **Deployment**: Docker, Google Cloud Run
@@ -32,4 +33,6 @@ Then run with:
 make docker-run
 ```
 
-And now `http://localhost::8080` on your machine should be live!
+**Make sure you have a .env file in the root directory with `PROJECT_ID` set correctly, and `DEV=true` in order to connect to the firestore emulator**
+
+And now `http://localhost:8000` on your machine should be live!
