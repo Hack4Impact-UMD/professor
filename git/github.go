@@ -21,6 +21,8 @@ func GetRepoSizeKB(path string) (int, error) {
 		return -1, err
 	}
 
+	defer resp.Body.Close()
+
 	repoData := githubRepoResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&repoData); err != nil {
 		return -1, err
