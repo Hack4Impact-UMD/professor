@@ -1,6 +1,7 @@
 package grade
 
 import (
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,7 +21,23 @@ type cloneResult struct {
 	TestDir       string
 }
 
-func cloneRepos(jobId string, assessmentRepoURL string, testRepoURL string) (cloneResult, error) {
+const MAX_REPO_SIZE_MB = 10
+
+func cloneWithSizeCheck(path string, dest string, pat string) error {
+	size, err := git.GetRepoSizeKB(path)
+
+	if err != nil {
+		return errors.New("failed to get repo details")
+	}
+
+	if size > MAX_REPO_SIZE_MB*1024 {
+		return errors.New("repo too large")
+	}
+
+	return git.CloneRepo(path, dest, pat)
+}
+
+func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string) (cloneResult, error) {
 	pat := os.Getenv("GITHUB_PAT")
 
 	gradingDir, err := os.MkdirTemp("", "job-*")
@@ -35,10 +52,10 @@ func cloneRepos(jobId string, assessmentRepoURL string, testRepoURL string) (clo
 	testDir := filepath.Join(gradingDir, "tests")
 
 	wg.Go(func() error {
-		return git.CloneRepo(assessmentRepoURL, assessmentDir, pat)
+		return cloneWithSizeCheck(assessmentRepoPath, assessmentDir, pat)
 	})
 	wg.Go(func() error {
-		return git.CloneRepo(testRepoURL, testDir, pat)
+		return cloneWithSizeCheck(testRepoPath, testDir, pat)
 	})
 
 	if err := wg.Wait(); err != nil {
@@ -53,13 +70,13 @@ func cloneRepos(jobId string, assessmentRepoURL string, testRepoURL string) (clo
 	}, nil
 }
 
-func RunGradingJob(jobId string, assessmentRepoURL string, testRepoURL string, reporter util.GradingJobReporter) error {
+func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string, reporter util.GradingJobReporter) error {
 	log.Println("Running grading job", jobId)
 	reporter.OnGradeStart(jobId)
 
-	reporter.OnCloneStart(jobId, assessmentRepoURL, testRepoURL)
-	clone, err := cloneRepos(jobId, assessmentRepoURL, testRepoURL)
-	reporter.OnCloneEnd(jobId, assessmentRepoURL, testRepoURL, err)
+	reporter.OnCloneStart(jobId, assessmentRepoPath, testRepoPath)
+	clone, err := cloneRepos(jobId, assessmentRepoPath, testRepoPath)
+	reporter.OnCloneEnd(jobId, assessmentRepoPath, testRepoPath, err)
 	if err != nil {
 		return err
 	}
