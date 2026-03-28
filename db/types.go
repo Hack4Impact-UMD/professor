@@ -3,12 +3,15 @@ package db
 import "time"
 
 const (
-	StatusPending   = "pending"
-	StatusCloning   = "cloning"
-	StatusBuilding  = "building"
-	StatusTesting   = "testing"
-	StatusCompleted = "completed"
-	StatusFailed    = "failed"
+	StatusQueued     = "queued"
+	StatusPending    = "pending"
+	StatusCloning    = "cloning"
+	StatusInstalling = "installing"
+	StatusBuilding   = "building"
+	StatusServing    = "serving"
+	StatusTesting    = "testing"
+	StatusCompleted  = "completed"
+	StatusFailed     = "failed"
 )
 
 type TestResult struct {
