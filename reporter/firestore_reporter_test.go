@@ -25,7 +25,11 @@ func TestFirestoreReporter(t *testing.T) {
 	}
 	defer client.Close()
 
-	reporter := NewFirestoreReporter(client)
+	reporter, err := NewFirestoreReporter(client)
+	if err != nil {
+		t.Fatalf("Failed to create reporter: %v", err)
+	}
+
 	jobId := "firestore_reporter_test"
 	initialData := map[string]any{
 		"id":         jobId,

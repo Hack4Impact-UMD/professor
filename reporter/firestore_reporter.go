@@ -1,6 +1,7 @@
 package reporter
 
 import (
+	"errors"
 	"sync"
 
 	"cloud.google.com/go/firestore"
@@ -22,11 +23,15 @@ type FirestoreReporter struct {
 	tests    map[string][]db.TestResult
 }
 
-func NewFirestoreReporter(fsClient *firestore.Client) *FirestoreReporter {
+func NewFirestoreReporter(fsClient *firestore.Client) (*FirestoreReporter, error) {
+	if fsClient == nil {
+		return nil, errors.New("fsClient argument for reporter is nil")
+	}
+
 	return &FirestoreReporter{
 		fsClient: fsClient,
 		tests:    make(map[string][]db.TestResult),
-	}
+	}, nil
 }
 
 func (r *FirestoreReporter) updatePublicDoc(jobId string, data map[string]any) {
