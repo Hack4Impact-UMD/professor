@@ -1,6 +1,10 @@
 .dockerignore
 .git
 .gitignore
+*.log
 
 # default build name
 professor
+
+firebase.json
+firestore.rules
