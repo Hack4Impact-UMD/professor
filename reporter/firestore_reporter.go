@@ -2,7 +2,6 @@ package reporter
 
 import (
 	"errors"
-	"sync"
 
 	"cloud.google.com/go/firestore"
 	"github.com/Hack4Impact-UMD/professor/db"
@@ -42,6 +41,13 @@ func (r *FirestoreReporter) updateInternalDoc(jobId string, data map[string]any)
 	return firebase.UpdateDoc(r.fsClient, collectionInternal, jobId, data)
 }
 
+func truncateLog(log string, maxBytes int) string {
+	if len(log) <= maxBytes {
+		return log
+	}
+	return "Tail:\n" + log[len(log)-maxBytes:]
+}
+
 func (r *FirestoreReporter) OnGradeStart(jobId string) {
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"status":  db.StatusPending,
@@ -49,15 +55,58 @@ func (r *FirestoreReporter) OnGradeStart(jobId string) {
 	})
 }
 
-// TODO: implement all of these; here for now to satisfy compiler
+func (r *FirestoreReporter) OnCloneStart(jobId string, assessmentRepo string, testRepo string) {
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"status":  db.StatusCloning,
+		"updated": firestore.ServerTimestamp,
+	})
 
-func (r *FirestoreReporter) OnCloneStart(jobId string, assessmentRepo string, testRepo string) {}
+	_ = r.updateInternalDoc(jobId, map[string]any{
+		"testRepo": testRepo,
+	})
+}
 
-func (r *FirestoreReporter) OnCloneEnd(jobId string, assessmentRepo string, testRepo string, err error) {}
+func (r *FirestoreReporter) OnCloneEnd(jobId string, assessmentRepo string, testRepo string, err error) {
+	if err != nil {
+		_ = r.updatePublicDoc(jobId, map[string]any{
+			"status":    db.StatusFailed,
+			"error":     err.Error(),
+			"completed": firestore.ServerTimestamp,
+			"updated":   firestore.ServerTimestamp,
+		})
 
-func (r *FirestoreReporter) OnInstallStart(jobId string) {}
+		_ = r.updateInternalDoc(jobId, map[string]any{
+			"error": err.Error(),
+		})
+	}
+}
 
-func (r *FirestoreReporter) OnInstallEnd(jobId string, out string, err error) {}
+func (r *FirestoreReporter) OnInstallStart(jobId string) {
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"status":  db.StatusInstalling,
+		"updated": firestore.ServerTimestamp,
+	})
+}
+
+func (r *FirestoreReporter) OnInstallEnd(jobId string, out string, err error) {
+	if err != nil {
+		_ = r.updatePublicDoc(jobId, map[string]any{
+			"status":    db.StatusFailed,
+			"error":     err.Error(),
+			"completed": firestore.ServerTimestamp,
+			"updated":   firestore.ServerTimestamp,
+		})
+
+		_ = r.updateInternalDoc(jobId, map[string]any{
+			"error":      err.Error(),
+			"installLog": truncateLog(out, maxLogBytes),
+		})
+	} else {
+		_ = r.updateInternalDoc(jobId, map[string]any{
+			"installLog": truncateLog(out, maxLogBytes),
+		})
+	}
+}
 
 func (r *FirestoreReporter) OnBuildStart(jobId string) {}
 
