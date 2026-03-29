@@ -34,16 +34,16 @@ func NewFirestoreReporter(fsClient *firestore.Client) (*FirestoreReporter, error
 	}, nil
 }
 
-func (r *FirestoreReporter) updatePublicDoc(jobId string, data map[string]any) {
-	firebase.UpdateDoc(r.fsClient, collectionPublic, jobId, data)
+func (r *FirestoreReporter) updatePublicDoc(jobId string, data map[string]any) error {
+	return firebase.UpdateDoc(r.fsClient, collectionPublic, jobId, data)
 }
 
-func (r *FirestoreReporter) updateInternalDoc(jobId string, data map[string]any) {
-	firebase.UpdateDoc(r.fsClient, collectionInternal, jobId, data)
+func (r *FirestoreReporter) updateInternalDoc(jobId string, data map[string]any) error {
+	return firebase.UpdateDoc(r.fsClient, collectionInternal, jobId, data)
 }
 
 func (r *FirestoreReporter) OnGradeStart(jobId string) {
-	r.updatePublicDoc(jobId, map[string]any{
+	_ = r.updatePublicDoc(jobId, map[string]any{
 		"status":  db.StatusPending,
 		"updated": firestore.ServerTimestamp,
 	})
