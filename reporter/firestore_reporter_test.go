@@ -2,7 +2,6 @@ package reporter
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/Hack4Impact-UMD/professor/db"
