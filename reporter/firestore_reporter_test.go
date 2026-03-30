@@ -269,4 +269,105 @@ func TestFirestoreReporter(t *testing.T) {
 		assertField(t, ctx, client, jobId, collectionInternal, "error", testErr.Error())
 		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
 	})
+
+	t.Run("OnTestStart doesn't panic", func(t *testing.T) {
+		reporter.OnTestStart(jobId, "suite1", "test1")
+	})
+
+	t.Run("OnTestEnd with passing test writes result and updates aggregations", func(t *testing.T) {
+		before := time.Now()
+
+		reporter.OnTestEnd(jobId, "suite1", "test1", true, "stdout output", "stderr output", []string{}, 150, nil)
+
+		doc, err := client.Collection(collectionInternal).Doc(jobId).Get(ctx)
+		if err != nil {
+			t.Fatalf("Failed to read internal document: %v", err)
+		}
+
+		tests := doc.Data()["tests"].(map[string]any)
+		suite1Tests := tests["suite1"].([]any)
+		if len(suite1Tests) != 1 {
+			t.Fatalf("Expected 1 test in suite1, got %d", len(suite1Tests))
+		}
+
+		testResult := suite1Tests[0].(map[string]any)
+		if testResult["testName"] != "test1" || testResult["passed"] != true {
+			t.Errorf("Test result incorrect: %v", testResult)
+		}
+
+		assertField(t, ctx, client, jobId, collectionPublic, "completedTests", int64(1))
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+
+		publicDoc, err := client.Collection(collectionPublic).Doc(jobId).Get(ctx)
+		if err != nil {
+			t.Fatalf("Failed to read public document: %v", err)
+		}
+
+		publicTests := publicDoc.Data()["publicTests"].(map[string]any)
+		suite1 := publicTests["suite1"].(map[string]any)
+
+		if suite1["passed"] != int64(1) || suite1["total"] != int64(1) || suite1["durationMs"] != int64(150) {
+			t.Errorf("Suite aggregations incorrect: %v", suite1)
+		}
+	})
+
+	t.Run("OnTestEnd with failing test updates aggregations correctly", func(t *testing.T) {
+		before := time.Now()
+
+		reporter.OnTestEnd(jobId, "suite1", "test2", false, "stdout", "stderr", []string{"error1"}, 200, nil)
+
+		doc, err := client.Collection(collectionInternal).Doc(jobId).Get(ctx)
+		if err != nil {
+			t.Fatalf("Failed to read internal document: %v", err)
+		}
+
+		tests := doc.Data()["tests"].(map[string]any)
+		suite1Tests := tests["suite1"].([]any)
+		if len(suite1Tests) != 2 {
+			t.Fatalf("Expected 2 tests in suite1, got %d", len(suite1Tests))
+		}
+
+		testResult := suite1Tests[1].(map[string]any)
+		if testResult["testName"] != "test2" || testResult["passed"] != false {
+			t.Errorf("Test result incorrect: %v", testResult)
+		}
+
+		assertField(t, ctx, client, jobId, collectionPublic, "completedTests", int64(2))
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+
+		publicDoc, err := client.Collection(collectionPublic).Doc(jobId).Get(ctx)
+		if err != nil {
+			t.Fatalf("Failed to read public document: %v", err)
+		}
+
+		publicTests := publicDoc.Data()["publicTests"].(map[string]any)
+		suite1 := publicTests["suite1"].(map[string]any)
+
+		if suite1["passed"] != int64(1) || suite1["failed"] != int64(1) || suite1["total"] != int64(2) || suite1["durationMs"] != int64(350) {
+			t.Errorf("Suite aggregations incorrect: %v", suite1)
+		}
+	})
+
+	t.Run("OnTestingEnd with no error marks job as completed", func(t *testing.T) {
+		before := time.Now()
+
+		reporter.OnTestingEnd(jobId, nil)
+
+		assertField(t, ctx, client, jobId, collectionPublic, "status", db.StatusCompleted)
+		assertFieldExists(t, ctx, client, jobId, collectionPublic, "completed")
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
+
+	t.Run("OnTestingEnd with error marks job as failed", func(t *testing.T) {
+		before := time.Now()
+		testErr := errors.New("playwright tests crashed")
+
+		reporter.OnTestingEnd(jobId, testErr)
+
+		assertField(t, ctx, client, jobId, collectionPublic, "status", db.StatusFailed)
+		assertField(t, ctx, client, jobId, collectionPublic, "error", testErr.Error())
+		assertFieldExists(t, ctx, client, jobId, collectionPublic, "completed")
+		assertField(t, ctx, client, jobId, collectionInternal, "error", testErr.Error())
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
 }

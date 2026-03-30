@@ -55,7 +55,7 @@ func (r *FirestoreReporter) OnGradeStart(jobId string) {
 	})
 }
 
-func (r *FirestoreReporter) OnCloneStart(jobId string, assessmentRepo string, testRepo string) {
+func (r *FirestoreReporter) OnCloneStart(jobId, assessmentRepo, testRepo string) {
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"status":  db.StatusCloning,
 		"updated": firestore.ServerTimestamp,
@@ -66,7 +66,7 @@ func (r *FirestoreReporter) OnCloneStart(jobId string, assessmentRepo string, te
 	})
 }
 
-func (r *FirestoreReporter) OnCloneEnd(jobId string, assessmentRepo string, testRepo string, err error) {
+func (r *FirestoreReporter) OnCloneEnd(jobId, assessmentRepo, testRepo string, err error) {
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":    db.StatusFailed,
@@ -94,7 +94,7 @@ func (r *FirestoreReporter) OnInstallStart(jobId string) {
 	})
 }
 
-func (r *FirestoreReporter) OnInstallEnd(jobId string, out string, err error) {
+func (r *FirestoreReporter) OnInstallEnd(jobId, out string, err error) {
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":    db.StatusFailed,
@@ -127,7 +127,7 @@ func (r *FirestoreReporter) OnBuildStart(jobId string) {
 	})
 }
 
-func (r *FirestoreReporter) OnBuildEnd(jobId string, out string, err error) {
+func (r *FirestoreReporter) OnBuildEnd(jobId, out string, err error) {
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":    db.StatusFailed,
@@ -197,10 +197,70 @@ func (r *FirestoreReporter) OnTestingStart(jobId string, suites []string, err er
 	})
 }
 
-func (r *FirestoreReporter) OnTestStart(jobId string, suite string, testName string) {}
+func (r *FirestoreReporter) OnTestStart(jobId, suite, testName string) {
+	// No-op rn as it would incur a lot of extra writes, but could update timestamp later
+}
 
-func (r *FirestoreReporter) OnTestEnd(jobId string, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, err error) {}
+func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, err error) {
+	result := db.TestResult{
+		Suite:      suite,
+		TestName:   testName,
+		Passed:     passed,
+		Stdout:     truncateLog(stdout, maxTestOutputBytes),
+		Stderr:     truncateLog(stderr, maxTestOutputBytes),
+		Errors:     testErrors,
+		DurationMs: durationMs,
+		Points:     0, // TODO: implement point extraction to fill this
+	}
 
-func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {}
+	_ = r.updateInternalDoc(jobId, map[string]any{
+		"tests": map[string]any{
+			suite: firestore.ArrayUnion(result),
+		},
+	})
+
+	publicTestUpdates := map[string]any{
+		"suiteName": suite,
+		"total":     firestore.Increment(1),
+		"durationMs": firestore.Increment(durationMs),
+	}
+
+	if passed {
+		publicTestUpdates["passed"] = firestore.Increment(1)
+	} else {
+		publicTestUpdates["failed"] = firestore.Increment(1)
+	}
+
+	publicTestUpdates["points"] = firestore.Increment(result.Points)
+	publicTestUpdates["totalPoints"] = firestore.Increment(result.Points)
+
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"completedTests": firestore.Increment(1),
+		"updated":        firestore.ServerTimestamp,
+		"publicTests": map[string]any{
+			suite: publicTestUpdates,
+		},
+	})
+}
+
+func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
+	data := map[string]any{
+		"updated":   firestore.ServerTimestamp,
+		"completed": firestore.ServerTimestamp,
+	}
+
+	if err != nil {
+		data["status"] = db.StatusFailed
+		data["error"] = err.Error()
+
+		_ = r.updateInternalDoc(jobId, map[string]any{
+			"error": err.Error(),
+		})
+	} else {
+		data["status"] = db.StatusCompleted
+	}
+
+	_ = r.updatePublicDoc(jobId, data)
+}
 
 var _ util.GradingJobReporter = (*FirestoreReporter)(nil)
