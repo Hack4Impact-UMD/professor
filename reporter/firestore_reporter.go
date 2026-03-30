@@ -120,13 +120,82 @@ func (r *FirestoreReporter) OnInstallEnd(jobId string, out string, err error) {
 	})
 }
 
-func (r *FirestoreReporter) OnBuildStart(jobId string) {}
+func (r *FirestoreReporter) OnBuildStart(jobId string) {
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"status":  db.StatusBuilding,
+		"updated": firestore.ServerTimestamp,
+	})
+}
 
-func (r *FirestoreReporter) OnBuildEnd(jobId string, out string, err error) {}
+func (r *FirestoreReporter) OnBuildEnd(jobId string, out string, err error) {
+	if err != nil {
+		_ = r.updatePublicDoc(jobId, map[string]any{
+			"status":    db.StatusFailed,
+			"error":     err.Error(),
+			"completed": firestore.ServerTimestamp,
+			"updated":   firestore.ServerTimestamp,
+		})
 
-func (r *FirestoreReporter) OnServe(jobId string, err error) {}
+		_ = r.updateInternalDoc(jobId, map[string]any{
+			"error":    err.Error(),
+			"buildLog": truncateLog(out, maxLogBytes),
+		})
 
-func (r *FirestoreReporter) OnTestingStart(jobId string, suites []string, err error) {}
+		return
+	}
+
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"updated": firestore.ServerTimestamp,
+	})
+
+	_ = r.updateInternalDoc(jobId, map[string]any{
+		"buildLog": truncateLog(out, maxLogBytes),
+	})
+}
+
+func (r *FirestoreReporter) OnServe(jobId string, err error) {
+	if err != nil {
+		_ = r.updatePublicDoc(jobId, map[string]any{
+			"status":    db.StatusFailed,
+			"error":     err.Error(),
+			"completed": firestore.ServerTimestamp,
+			"updated":   firestore.ServerTimestamp,
+		})
+
+		_ = r.updateInternalDoc(jobId, map[string]any{
+			"error": err.Error(),
+		})
+
+		return
+	}
+
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"status":  db.StatusServing,
+		"updated": firestore.ServerTimestamp,
+	})
+}
+
+func (r *FirestoreReporter) OnTestingStart(jobId string, suites []string, err error) {
+	if err != nil {
+		_ = r.updatePublicDoc(jobId, map[string]any{
+			"status":    db.StatusFailed,
+			"error":     err.Error(),
+			"completed": firestore.ServerTimestamp,
+			"updated":   firestore.ServerTimestamp,
+		})
+
+		_ = r.updateInternalDoc(jobId, map[string]any{
+			"error": err.Error(),
+		})
+
+		return
+	}
+
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"status":  db.StatusTesting,
+		"updated": firestore.ServerTimestamp,
+	})
+}
 
 func (r *FirestoreReporter) OnTestStart(jobId string, suite string, testName string) {}
 

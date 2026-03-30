@@ -191,4 +191,82 @@ func TestFirestoreReporter(t *testing.T) {
 		assertField(t, ctx, client, jobId, collectionInternal, "installLog", installOutput)
 		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
 	})
+
+	t.Run("OnBuildStart updates status", func(t *testing.T) {
+		before := time.Now()
+
+		reporter.OnBuildStart(jobId)
+
+		assertField(t, ctx, client, jobId, collectionPublic, "status", db.StatusBuilding)
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
+
+	t.Run("OnBuildEnd with success stores log", func(t *testing.T) {
+		before := time.Now()
+		buildOutput := "Build successful\nCompiled 15 files"
+
+		reporter.OnBuildEnd(jobId, buildOutput, nil)
+
+		assertField(t, ctx, client, jobId, collectionInternal, "buildLog", buildOutput)
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
+
+	t.Run("OnBuildEnd with error marks job as failed", func(t *testing.T) {
+		before := time.Now()
+		testErr := errors.New("build failed: syntax error")
+		buildOutput := "Error: unexpected token"
+
+		reporter.OnBuildEnd(jobId, buildOutput, testErr)
+
+		assertField(t, ctx, client, jobId, collectionPublic, "status", db.StatusFailed)
+		assertField(t, ctx, client, jobId, collectionPublic, "error", testErr.Error())
+		assertFieldExists(t, ctx, client, jobId, collectionPublic, "completed")
+		assertField(t, ctx, client, jobId, collectionInternal, "error", testErr.Error())
+		assertField(t, ctx, client, jobId, collectionInternal, "buildLog", buildOutput)
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
+
+	t.Run("OnServe with no error updates status to serving", func(t *testing.T) {
+		before := time.Now()
+
+		reporter.OnServe(jobId, nil)
+
+		assertField(t, ctx, client, jobId, collectionPublic, "status", db.StatusServing)
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
+
+	t.Run("OnServe with error marks job as failed", func(t *testing.T) {
+		before := time.Now()
+		testErr := errors.New("failed to start server: port already in use")
+
+		reporter.OnServe(jobId, testErr)
+
+		assertField(t, ctx, client, jobId, collectionPublic, "status", db.StatusFailed)
+		assertField(t, ctx, client, jobId, collectionPublic, "error", testErr.Error())
+		assertFieldExists(t, ctx, client, jobId, collectionPublic, "completed")
+		assertField(t, ctx, client, jobId, collectionInternal, "error", testErr.Error())
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
+
+	t.Run("OnTestingStart with no error updates status to testing", func(t *testing.T) {
+		before := time.Now()
+
+		reporter.OnTestingStart(jobId, []string{"suite1", "suite2"}, nil)
+
+		assertField(t, ctx, client, jobId, collectionPublic, "status", db.StatusTesting)
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
+
+	t.Run("OnTestingStart with error marks job as failed", func(t *testing.T) {
+		before := time.Now()
+		testErr := errors.New("failed to discover tests")
+
+		reporter.OnTestingStart(jobId, nil, testErr)
+
+		assertField(t, ctx, client, jobId, collectionPublic, "status", db.StatusFailed)
+		assertField(t, ctx, client, jobId, collectionPublic, "error", testErr.Error())
+		assertFieldExists(t, ctx, client, jobId, collectionPublic, "completed")
+		assertField(t, ctx, client, jobId, collectionInternal, "error", testErr.Error())
+		assertUpdateTimeChanged(t, ctx, client, jobId, collectionPublic, before)
+	})
 }
