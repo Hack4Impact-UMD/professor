@@ -244,23 +244,26 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 }
 
 func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
-	data := map[string]any{
-		"updated":   firestore.ServerTimestamp,
-		"completed": firestore.ServerTimestamp,
-	}
-
 	if err != nil {
-		data["status"] = db.StatusFailed
-		data["error"] = err.Error()
+		_ = r.updatePublicDoc(jobId, map[string]any{
+			"status":    db.StatusFailed,
+			"error":     err.Error(),
+			"completed": firestore.ServerTimestamp,
+			"updated":   firestore.ServerTimestamp,
+		})
 
 		_ = r.updateInternalDoc(jobId, map[string]any{
 			"error": err.Error(),
 		})
-	} else {
-		data["status"] = db.StatusCompleted
+
+		return
 	}
 
-	_ = r.updatePublicDoc(jobId, data)
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"status":  db.StatusCompleted,
+		"completed": firestore.ServerTimestamp,
+		"updated": firestore.ServerTimestamp,
+	})
 }
 
 var _ util.GradingJobReporter = (*FirestoreReporter)(nil)
