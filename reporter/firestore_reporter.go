@@ -78,7 +78,13 @@ func (r *FirestoreReporter) OnCloneEnd(jobId string, assessmentRepo string, test
 		_ = r.updateInternalDoc(jobId, map[string]any{
 			"error": err.Error(),
 		})
+
+		return
 	}
+	
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"updated": firestore.ServerTimestamp,
+	})
 }
 
 func (r *FirestoreReporter) OnInstallStart(jobId string) {
@@ -101,11 +107,17 @@ func (r *FirestoreReporter) OnInstallEnd(jobId string, out string, err error) {
 			"error":      err.Error(),
 			"installLog": truncateLog(out, maxLogBytes),
 		})
-	} else {
-		_ = r.updateInternalDoc(jobId, map[string]any{
-			"installLog": truncateLog(out, maxLogBytes),
-		})
+
+		return
 	}
+	
+	_ = r.updatePublicDoc(jobId, map[string]any{
+		"updated": firestore.ServerTimestamp,
+	})
+
+	_ = r.updateInternalDoc(jobId, map[string]any{
+		"installLog": truncateLog(out, maxLogBytes),
+	})
 }
 
 func (r *FirestoreReporter) OnBuildStart(jobId string) {}
