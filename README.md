@@ -2,6 +2,32 @@
 
 Worker for the [Hack4Impact-UMD App Portal](apply.umd.hack4impact.org) assessment autograder.
 
+## Architecture
+
+```mermaid
+graph TB
+    User[Applicant] -->|Submits Assessment| Frontend[App Portal - Frontend]
+    Frontend[App Portal - Frontend] -->|Reads Status and Results| User[Applicant]
+    Frontend -->|Requests Grading| Backend[App Portal - Backend]
+
+    Backend -->|Creates Documents| Firestore[(Firestore)]
+    Backend -->|Enqueues Job| CloudTasks[Queue - Cloud Tasks]
+
+    CloudTasks -->|Delivers Job| Professor[Professor - Cloud Run]
+
+    Professor -->|Updates Documents| Firestore
+    Professor -->|Clones Repo| GitHub[GitHub]
+    Professor -->|Tests Repo| Playwright[Playwright]
+
+    Firestore -->|Reads Documents| Frontend
+
+    style Frontend fill:#4285f4,color:#fff
+    style Backend fill:#4285f4,color:#fff
+    style Professor fill:#9334e9,color:#fff
+    style Firestore fill:#ffa000,color:#fff
+    style CloudTasks fill:#34a853,color:#fff
+```
+
 ## Tech Stack
 
 - **Language**: Go

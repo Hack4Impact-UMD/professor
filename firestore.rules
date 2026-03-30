@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ⚠️ WARNING: EMULATOR ONLY!! 
+
+    match /gradingJobs/{jobId} {
+      allow read, update: if true;
+      allow create, delete: if false; 
+    }
+
+    match /gradingJobsInternal/{jobId} {
+      allow read, update: if true;   
+      allow create, delete: if false; 
+
+    match /{document=**} {
+      allow read, write: if false; 
+    }
+  }
+}
