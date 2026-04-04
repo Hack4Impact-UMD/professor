@@ -3,12 +3,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // ⚠️ WARNING: EMULATOR ONLY!! 
 
-    match /gradingJobs/{jobId} {
+    match /grading-jobs-public/{jobId} {
       allow read, update: if true;
       allow create, delete: if false; 
     }
 
-    match /gradingJobsInternal/{jobId} {
+    match /grading-jobs-internal/{jobId} {
       allow read, update: if true;   
       allow create, delete: if false; 
 
