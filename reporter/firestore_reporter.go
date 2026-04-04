@@ -13,8 +13,8 @@ const (
 	maxLogBytes        = 50 * 1024 // 50KB 
 	maxTestOutputBytes = 10 * 1024 // 10KB 
 
-	collectionPublic   = "gradingJobs"
-	collectionInternal = "gradingJobsInternal"
+	collectionPublic   = "grading-jobs-public"
+	collectionInternal = "grading-jobs-internal"
 )
 
 type FirestoreReporter struct {
