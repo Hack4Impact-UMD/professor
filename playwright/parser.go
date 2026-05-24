@@ -12,6 +12,8 @@ type TestMeta struct {
 	Public bool
 }
 
+// Ex: [5] - A 5 pt private test
+// Ex: [10*] - A 10 pt public test
 func ParseTestName(name string) (TestMeta, error) {
 	re := regexp.MustCompile(`\[(\d+)(\*)?\] \- (.*)`)
 	matches := re.FindStringSubmatch(name)
