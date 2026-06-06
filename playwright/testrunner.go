@@ -81,7 +81,7 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 64*1024), 10*1024*1024)
-	endRecieved := false
+	endReceived := false
 	for scanner.Scan() {
 		var event ndjsonEvent
 		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
@@ -105,7 +105,7 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 			)
 		case "end":
 			{
-				endRecieved = true
+				endReceived = true
 				reporter.OnTestingEnd(jobId, nil)
 			}
 		}
@@ -118,7 +118,7 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 	}
 
 	if err := cmd.Wait(); err != nil {
-		if !endRecieved {
+		if !endReceived {
 			return err
 		}
 	}

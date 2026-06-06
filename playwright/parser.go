@@ -30,7 +30,7 @@ func ParseTestName(name string) (TestMeta, error) {
 	matches := re.FindStringSubmatch(name)
 
 	if len(matches) != 4 {
-		return TestMeta{}, errors.New("Did not match test name regex")
+		return TestMeta{}, errors.New("did not match test name regex")
 	}
 
 	pts, err := strconv.Atoi(matches[1])
