@@ -30,3 +30,15 @@ func UpdateDoc(client *firestore.Client, collection, docId string, data map[stri
 
 	return nil
 }
+
+func UpdateDocFields(client *firestore.Client, collection, docId string, updates []firestore.Update) error {
+	ctx := context.Background()
+	_, err := client.Collection(collection).Doc(docId).Update(ctx, updates)
+
+	if err != nil {
+		log.Printf("ERROR: Failed to update fields in %s/%s: %v", collection, docId, err)
+		return err
+	}
+
+	return nil
+}

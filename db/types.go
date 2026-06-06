@@ -18,6 +18,7 @@ type TestResult struct {
 	Suite      string   `firestore:"suite"`
 	TestName   string   `firestore:"testName"`
 	Passed     bool     `firestore:"passed"`
+	Pending    bool     `firestore:"pending"`
 	Stdout     string   `firestore:"stdout"`
 	Stderr     string   `firestore:"stderr"`
 	Errors     []string `firestore:"errors"`
@@ -48,8 +49,8 @@ type GradingJobPublic struct {
 	Started        time.Time               `firestore:"started"`
 	Completed      time.Time               `firestore:"completed,omitempty"`
 	Updated        time.Time               `firestore:"updated"`
-	SuiteResults   map[string]SuiteResult  `firestore:"suiteResults"` // map of suite name -> public results
-	PublicTests    map[string][]TestResult `firestore:"publicTests"`  // results for public tests
+	SuiteResults   map[string]SuiteResult         `firestore:"suiteResults"` // map of suite name -> public results
+	PublicTests    map[string]map[string]TestResult `firestore:"publicTests"`  // suite name -> test name -> result (public tests only)
 }
 
 // other fields can be fetched from GradingJobPublic
@@ -60,5 +61,5 @@ type GradingJobDataInternal struct {
 	InstallLog    string                  `firestore:"installLog"`
 	PlaywrightLog string                  `firestore:"playwrightLog"`
 	Error         string                  `firestore:"error,omitempty"`
-	Tests         map[string][]TestResult `firestore:"tests"` // map of suite name -> tests
+	Tests         map[string]map[string]TestResult `firestore:"tests"` // suite name -> test name -> result
 }

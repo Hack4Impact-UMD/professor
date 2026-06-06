@@ -30,7 +30,7 @@ type ndjsonEvent struct {
 }
 
 func extractTestRepo(testDir string) (TestRepo, error) {
-	cmd := exec.Command("npm", "run", "extract-tests")
+	cmd := exec.Command("npm", "run", "extract-tests", "--silent")
 	cmd.Dir = testDir
 	out, err := cmd.Output()
 	if err != nil {
