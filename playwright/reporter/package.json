@@ -5,9 +5,13 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
+    "acorn": "^8.0.0",
+    "acorn-typescript": "^1.0.0",
+    "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },
   "scripts": {
+    "extract-tests": "tsx extract-tests.ts",
     "test": "playwright test"
   }
 }

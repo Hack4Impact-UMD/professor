@@ -1,4 +1,4 @@
-package util
+package playwright
 
 type GradingJobReporter interface {
 	OnGradeStart(jobId string)
@@ -9,7 +9,7 @@ type GradingJobReporter interface {
 	OnBuildStart(jobId string)
 	OnBuildEnd(jobId string, out string, err error)
 	OnServe(jobId string, err error)
-	OnTestingStart(jobId string, suites []string, err error)
+	OnTestingStart(jobId string, repo TestRepo, err error)
 	OnTestStart(jobId string, suite string, testName string)
 	OnTestEnd(jobId string, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, err error)
 	OnTestingEnd(jobId string, err error)

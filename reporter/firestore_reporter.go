@@ -6,20 +6,21 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/Hack4Impact-UMD/professor/db"
 	"github.com/Hack4Impact-UMD/professor/firebase"
-	"github.com/Hack4Impact-UMD/professor/util"
+	"github.com/Hack4Impact-UMD/professor/playwright"
 )
 
 const (
-	maxLogBytes        = 50 * 1024 // 50KB 
-	maxTestOutputBytes = 10 * 1024 // 10KB 
+	maxLogBytes        = 50 * 1024 // 50KB
+	maxTestOutputBytes = 10 * 1024 // 10KB
 
 	collectionPublic   = "grading-jobs-public"
 	collectionInternal = "grading-jobs-internal"
 )
 
 type FirestoreReporter struct {
-	fsClient *firestore.Client
-	tests    map[string][]db.TestResult
+	fsClient      *firestore.Client
+	publicTestSet map[string]map[string]bool // suite -> testName -> isPublic
+	testPoints    map[string]map[string]int  // suite -> testName -> points
 }
 
 func NewFirestoreReporter(fsClient *firestore.Client) (*FirestoreReporter, error) {
@@ -28,9 +29,19 @@ func NewFirestoreReporter(fsClient *firestore.Client) (*FirestoreReporter, error
 	}
 
 	return &FirestoreReporter{
-		fsClient: fsClient,
-		tests:    make(map[string][]db.TestResult),
+		fsClient:      fsClient,
+		publicTestSet: make(map[string]map[string]bool),
+		testPoints:    make(map[string]map[string]int),
 	}, nil
+}
+
+func suiteTotalPoints(suite playwright.TestSuite) int {
+	sum := 0
+	for _, t := range suite.Tests {
+		sum += t.Points
+	}
+
+	return sum
 }
 
 func (r *FirestoreReporter) updatePublicDoc(jobId string, data map[string]any) error {
@@ -81,7 +92,7 @@ func (r *FirestoreReporter) OnCloneEnd(jobId, assessmentRepo, testRepo string, e
 
 		return
 	}
-	
+
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"updated": firestore.ServerTimestamp,
 	})
@@ -110,7 +121,7 @@ func (r *FirestoreReporter) OnInstallEnd(jobId, out string, err error) {
 
 		return
 	}
-	
+
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"updated": firestore.ServerTimestamp,
 	})
@@ -175,7 +186,7 @@ func (r *FirestoreReporter) OnServe(jobId string, err error) {
 	})
 }
 
-func (r *FirestoreReporter) OnTestingStart(jobId string, suites []string, err error) {
+func (r *FirestoreReporter) OnTestingStart(jobId string, repo playwright.TestRepo, err error) {
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":    db.StatusFailed,
@@ -191,9 +202,63 @@ func (r *FirestoreReporter) OnTestingStart(jobId string, suites []string, err er
 		return
 	}
 
+	publicTestMap := make(map[string]map[string]db.TestResult)
+	testMap := make(map[string]map[string]db.TestResult)
+	suiteResults := make(map[string]db.SuiteResult)
+
+	r.publicTestSet = make(map[string]map[string]bool)
+	r.testPoints = make(map[string]map[string]int)
+
+	for _, suite := range repo.Suites {
+		sr := db.SuiteResult{
+			SuiteName:   suite.Name,
+			Passed:      0,
+			Failed:      0,
+			Total:       len(suite.Tests),
+			DurationMs:  0,
+			TotalPoints: suiteTotalPoints(suite),
+		}
+
+		suiteResults[suite.Name] = sr
+		publicTestMap[suite.Name] = make(map[string]db.TestResult)
+		testMap[suite.Name] = make(map[string]db.TestResult)
+		r.publicTestSet[suite.Name] = make(map[string]bool)
+		r.testPoints[suite.Name] = make(map[string]int)
+
+		for _, test := range suite.Tests {
+			result := db.TestResult{
+				Suite:      suite.Name,
+				TestName:   test.Name,
+				Passed:     false,
+				Pending:    true,
+				Stdout:     "",
+				Stderr:     "",
+				Errors:     make([]string, 0),
+				DurationMs: 0,
+				Points:     test.Points,
+			}
+
+			if test.Public {
+				publicTestMap[suite.Name][test.Name] = result
+				r.publicTestSet[suite.Name][test.Name] = true
+			}
+
+			testMap[suite.Name][test.Name] = result
+			r.testPoints[suite.Name][test.Name] = test.Points
+		}
+	}
+
 	_ = r.updatePublicDoc(jobId, map[string]any{
+		"status":       db.StatusTesting,
+		"updated":      firestore.ServerTimestamp,
+		"publicTests":  publicTestMap,
+		"suiteResults": suiteResults,
+	})
+
+	_ = r.updateInternalDoc(jobId, map[string]any{
 		"status":  db.StatusTesting,
 		"updated": firestore.ServerTimestamp,
+		"tests":   testMap,
 	})
 }
 
@@ -202,45 +267,51 @@ func (r *FirestoreReporter) OnTestStart(jobId, suite, testName string) {
 }
 
 func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, err error) {
+	var points int
+	if suitePoints, ok := r.testPoints[suite]; ok {
+		points = suitePoints[testName] // defaults to 0 if testName not found
+	}
+
 	result := db.TestResult{
 		Suite:      suite,
 		TestName:   testName,
 		Passed:     passed,
+		Pending:    false,
 		Stdout:     truncateLog(stdout, maxTestOutputBytes),
 		Stderr:     truncateLog(stderr, maxTestOutputBytes),
 		Errors:     testErrors,
 		DurationMs: durationMs,
-		Points:     0, // TODO: implement point extraction to fill this
+		Points:     points,
 	}
 
-	_ = r.updateInternalDoc(jobId, map[string]any{
-		"tests": map[string]any{
-			suite: firestore.ArrayUnion(result),
-		},
+	_ = firebase.UpdateDocFields(r.fsClient, collectionInternal, jobId, []firestore.Update{
+		{FieldPath: firestore.FieldPath{"tests", suite, testName}, Value: result},
 	})
 
-	publicTestUpdates := map[string]any{
-		"suiteName": suite,
-		"total":     firestore.Increment(1),
-		"durationMs": firestore.Increment(durationMs),
+	publicUpdates := []firestore.Update{
+		{Path: "completedTests", Value: firestore.Increment(1)},
+		{Path: "updated", Value: firestore.ServerTimestamp},
+		{FieldPath: firestore.FieldPath{"suiteResults", suite, "durationMs"}, Value: firestore.Increment(durationMs)},
 	}
 
 	if passed {
-		publicTestUpdates["passed"] = firestore.Increment(1)
+		publicUpdates = append(publicUpdates,
+			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "passed"}, Value: firestore.Increment(1)},
+			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "points"}, Value: firestore.Increment(points)},
+		)
 	} else {
-		publicTestUpdates["failed"] = firestore.Increment(1)
+		publicUpdates = append(publicUpdates,
+			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "failed"}, Value: firestore.Increment(1)},
+		)
 	}
 
-	publicTestUpdates["points"] = firestore.Increment(result.Points)
-	publicTestUpdates["totalPoints"] = firestore.Increment(result.Points)
+	if suitePublic, ok := r.publicTestSet[suite]; ok && suitePublic[testName] {
+		publicUpdates = append(publicUpdates,
+			firestore.Update{FieldPath: firestore.FieldPath{"publicTests", suite, testName}, Value: result},
+		)
+	}
 
-	_ = r.updatePublicDoc(jobId, map[string]any{
-		"completedTests": firestore.Increment(1),
-		"updated":        firestore.ServerTimestamp,
-		"publicTests": map[string]any{
-			suite: publicTestUpdates,
-		},
-	})
+	_ = firebase.UpdateDocFields(r.fsClient, collectionPublic, jobId, publicUpdates)
 }
 
 func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
@@ -260,10 +331,10 @@ func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
 	}
 
 	_ = r.updatePublicDoc(jobId, map[string]any{
-		"status":  db.StatusCompleted,
+		"status":    db.StatusCompleted,
 		"completed": firestore.ServerTimestamp,
-		"updated": firestore.ServerTimestamp,
+		"updated":   firestore.ServerTimestamp,
 	})
 }
 
-var _ util.GradingJobReporter = (*FirestoreReporter)(nil)
+var _ playwright.GradingJobReporter = (*FirestoreReporter)(nil)

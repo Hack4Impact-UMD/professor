@@ -1,10 +1,11 @@
+//go:build firestore
+
 package reporter
 
 import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/Hack4Impact-UMD/professor/db"
@@ -90,7 +91,7 @@ func TestFirestoreReporter(t *testing.T) {
 
 	jobId := "firestore_reporter_test"
 	setupJobDocs(t, ctx, client, jobId)
-	
+
 	defer cleanupJobDocs(ctx, client, jobId)
 
 	t.Run("OnGradeStart updates status", func(t *testing.T) {

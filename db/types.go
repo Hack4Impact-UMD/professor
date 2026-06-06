@@ -18,6 +18,7 @@ type TestResult struct {
 	Suite      string   `firestore:"suite"`
 	TestName   string   `firestore:"testName"`
 	Passed     bool     `firestore:"passed"`
+	Pending    bool     `firestore:"pending"`
 	Stdout     string   `firestore:"stdout"`
 	Stderr     string   `firestore:"stderr"`
 	Errors     []string `firestore:"errors"`
@@ -26,7 +27,7 @@ type TestResult struct {
 }
 
 // only suite-level results are displayed to applicants
-type PublicTestResult struct {
+type SuiteResult struct {
 	SuiteName   string `firestore:"suiteName"`
 	Passed      int    `firestore:"passed"`
 	Failed      int    `firestore:"failed"`
@@ -37,20 +38,22 @@ type PublicTestResult struct {
 }
 
 type GradingJobPublic struct {
-	Id             string                      `firestore:"id"`
-	ResponseId     string                      `firestore:"responseId"`
-	RepoURL        string                      `firestore:"repoURL"`
-	Status         string                      `firestore:"status"`
-	Score          float64                     `firestore:"score"`
-	TotalTests     int                         `firestore:"totalTests"`
-	CompletedTests int                         `firestore:"completedTests"`
-	Error          string                      `firestore:"error,omitempty"`
-	Started        time.Time                   `firestore:"started"`
-	Completed      time.Time                   `firestore:"completed,omitempty"`
-	Updated        time.Time                   `firestore:"updated"`
-	PublicTests    map[string]PublicTestResult `firestore:"publicTests"` // map of suite name -> public results
+	Id             string                  `firestore:"id"`
+	ResponseId     string                  `firestore:"responseId"`
+	RepoURL        string                  `firestore:"repoURL"`
+	Status         string                  `firestore:"status"`
+	Score          float64                 `firestore:"score"`
+	TotalTests     int                     `firestore:"totalTests"`
+	CompletedTests int                     `firestore:"completedTests"`
+	Error          string                  `firestore:"error,omitempty"`
+	Started        time.Time               `firestore:"started"`
+	Completed      time.Time               `firestore:"completed,omitempty"`
+	Updated        time.Time               `firestore:"updated"`
+	SuiteResults   map[string]SuiteResult         `firestore:"suiteResults"` // map of suite name -> public results
+	PublicTests    map[string]map[string]TestResult `firestore:"publicTests"`  // suite name -> test name -> result (public tests only)
 }
 
+// other fields can be fetched from GradingJobPublic
 type GradingJobDataInternal struct {
 	Id            string                  `firestore:"id"` // associated with a grading job id
 	TestRepo      string                  `firestore:"testRepo"`
@@ -58,5 +61,5 @@ type GradingJobDataInternal struct {
 	InstallLog    string                  `firestore:"installLog"`
 	PlaywrightLog string                  `firestore:"playwrightLog"`
 	Error         string                  `firestore:"error,omitempty"`
-	Tests         map[string][]TestResult `firestore:"tests"` // map of suite name -> tests
+	Tests         map[string]map[string]TestResult `firestore:"tests"` // suite name -> test name -> result
 }

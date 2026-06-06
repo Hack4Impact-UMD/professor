@@ -22,8 +22,8 @@ type mockReporter struct {
 	mu    sync.Mutex
 	calls []string
 
-	testingStartSuites []string
-	testEnds           []mockTestEnd
+	testingStartRepo TestRepo
+	testEnds         []mockTestEnd
 }
 
 type mockTestEnd struct {
@@ -52,10 +52,10 @@ func (r *mockReporter) OnTestStart(jobId, suite, testName string) {
 	r.record("OnTestStart:" + suite + "/" + testName)
 }
 
-func (r *mockReporter) OnTestingStart(jobId string, suites []string, err error) {
+func (r *mockReporter) OnTestingStart(jobId string, repo TestRepo, err error) {
 	r.record("OnTestingStart")
 	r.mu.Lock()
-	r.testingStartSuites = suites
+	r.testingStartRepo = repo
 	r.mu.Unlock()
 }
 
@@ -112,18 +112,20 @@ func TestRunPlaywrightTests(t *testing.T) {
 		t.Fatal("OnTestingStart was never called")
 	}
 	foundSuite := false
-	for _, s := range rep.testingStartSuites {
-		if s == "my suite" {
+	rep.mu.Lock()
+	for _, s := range rep.testingStartRepo.Suites {
+		if s.Name == "my suite" {
 			foundSuite = true
 			break
 		}
 	}
+	rep.mu.Unlock()
 	if !foundSuite {
-		t.Errorf("OnTestingStart: suites %v do not contain \"my suite\"", rep.testingStartSuites)
+		t.Errorf("OnTestingStart: suites %v do not contain \"my suite\"", rep.testingStartRepo.Suites)
 	}
 
 	// Both tests must produce OnTestStart and OnTestEnd events
-	for _, name := range []string{"has title", "has heading"} {
+	for _, name := range []string{"[5] - has title", "[5*] - has heading"} {
 		if !rep.hasCall("OnTestStart:my suite/" + name) {
 			t.Errorf("OnTestStart never fired for test %q", name)
 		}

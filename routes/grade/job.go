@@ -70,7 +70,7 @@ func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string) (c
 	}, nil
 }
 
-func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string, reporter util.GradingJobReporter) error {
+func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string, reporter playwright.GradingJobReporter) error {
 	log.Println("Running grading job", jobId)
 	reporter.OnGradeStart(jobId)
 
