@@ -6,12 +6,12 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/Hack4Impact-UMD/professor/db"
 	"github.com/Hack4Impact-UMD/professor/firebase"
-	"github.com/Hack4Impact-UMD/professor/util"
+	"github.com/Hack4Impact-UMD/professor/playwright"
 )
 
 const (
-	maxLogBytes        = 50 * 1024 // 50KB 
-	maxTestOutputBytes = 10 * 1024 // 10KB 
+	maxLogBytes        = 50 * 1024 // 50KB
+	maxTestOutputBytes = 10 * 1024 // 10KB
 
 	collectionPublic   = "grading-jobs-public"
 	collectionInternal = "grading-jobs-internal"
@@ -81,7 +81,7 @@ func (r *FirestoreReporter) OnCloneEnd(jobId, assessmentRepo, testRepo string, e
 
 		return
 	}
-	
+
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"updated": firestore.ServerTimestamp,
 	})
@@ -110,7 +110,7 @@ func (r *FirestoreReporter) OnInstallEnd(jobId, out string, err error) {
 
 		return
 	}
-	
+
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"updated": firestore.ServerTimestamp,
 	})
@@ -175,7 +175,7 @@ func (r *FirestoreReporter) OnServe(jobId string, err error) {
 	})
 }
 
-func (r *FirestoreReporter) OnTestingStart(jobId string, suites []string, err error) {
+func (r *FirestoreReporter) OnTestingStart(jobId string, repo playwright.TestRepo, err error) {
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":    db.StatusFailed,
@@ -220,8 +220,8 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 	})
 
 	publicTestUpdates := map[string]any{
-		"suiteName": suite,
-		"total":     firestore.Increment(1),
+		"suiteName":  suite,
+		"total":      firestore.Increment(1),
 		"durationMs": firestore.Increment(durationMs),
 	}
 
@@ -260,10 +260,10 @@ func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
 	}
 
 	_ = r.updatePublicDoc(jobId, map[string]any{
-		"status":  db.StatusCompleted,
+		"status":    db.StatusCompleted,
 		"completed": firestore.ServerTimestamp,
-		"updated": firestore.ServerTimestamp,
+		"updated":   firestore.ServerTimestamp,
 	})
 }
 
-var _ util.GradingJobReporter = (*FirestoreReporter)(nil)
+var _ playwright.GradingJobReporter = (*FirestoreReporter)(nil)

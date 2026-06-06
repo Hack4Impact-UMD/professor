@@ -26,7 +26,7 @@ type TestResult struct {
 }
 
 // only suite-level results are displayed to applicants
-type PublicTestResult struct {
+type SuiteResult struct {
 	SuiteName   string `firestore:"suiteName"`
 	Passed      int    `firestore:"passed"`
 	Failed      int    `firestore:"failed"`
@@ -37,20 +37,22 @@ type PublicTestResult struct {
 }
 
 type GradingJobPublic struct {
-	Id             string                      `firestore:"id"`
-	ResponseId     string                      `firestore:"responseId"`
-	RepoURL        string                      `firestore:"repoURL"`
-	Status         string                      `firestore:"status"`
-	Score          float64                     `firestore:"score"`
-	TotalTests     int                         `firestore:"totalTests"`
-	CompletedTests int                         `firestore:"completedTests"`
-	Error          string                      `firestore:"error,omitempty"`
-	Started        time.Time                   `firestore:"started"`
-	Completed      time.Time                   `firestore:"completed,omitempty"`
-	Updated        time.Time                   `firestore:"updated"`
-	PublicTests    map[string]PublicTestResult `firestore:"publicTests"` // map of suite name -> public results
+	Id             string                  `firestore:"id"`
+	ResponseId     string                  `firestore:"responseId"`
+	RepoURL        string                  `firestore:"repoURL"`
+	Status         string                  `firestore:"status"`
+	Score          float64                 `firestore:"score"`
+	TotalTests     int                     `firestore:"totalTests"`
+	CompletedTests int                     `firestore:"completedTests"`
+	Error          string                  `firestore:"error,omitempty"`
+	Started        time.Time               `firestore:"started"`
+	Completed      time.Time               `firestore:"completed,omitempty"`
+	Updated        time.Time               `firestore:"updated"`
+	SuiteResults   map[string]SuiteResult  `firestore:"suiteResults"` // map of suite name -> public results
+	PublicTests    map[string][]TestResult `firestore:"publicTests"`  // results for public tests
 }
 
+// other fields can be fetched from GradingJobPublic
 type GradingJobDataInternal struct {
 	Id            string                  `firestore:"id"` // associated with a grading job id
 	TestRepo      string                  `firestore:"testRepo"`
