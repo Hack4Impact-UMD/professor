@@ -7,7 +7,7 @@ import (
 )
 
 func GradeHandler(w http.ResponseWriter, r *http.Request, fsClient *firestore.Client) {
-
+	w.Write([]byte("Hello from professor!"))
 }
 
 func RegisterHandlers(mux *http.ServeMux, fsClient *firestore.Client) {
