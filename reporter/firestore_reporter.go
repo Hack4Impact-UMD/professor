@@ -268,8 +268,8 @@ func (r *FirestoreReporter) OnTestStart(jobId, suite, testName string) {
 
 func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, err error) {
 	var points int
-	if pts, ok := r.testPoints[suite][testName]; ok {
-		points = pts
+	if suitePoints, ok := r.testPoints[suite]; ok {
+		points = suitePoints[testName] // defaults to 0 if testName not found
 	}
 
 	result := db.TestResult{
