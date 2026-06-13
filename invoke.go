@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/Hack4Impact-UMD/professor/cmd"
 	"github.com/joho/godotenv"
@@ -9,10 +9,8 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("warn: could not load .env")
+		slog.Warn("could not load .env", "err", err)
 	}
 
-	if err := cmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
+	cmd.Execute()
 }

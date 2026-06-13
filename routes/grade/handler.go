@@ -3,6 +3,7 @@ package grade
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"cloud.google.com/go/firestore"
@@ -32,7 +33,7 @@ func GradeHandler(w http.ResponseWriter, r *http.Request, fsClient *firestore.Cl
 		http.Error(w, fmt.Sprintf("reporter create error: %v", err.Error()), http.StatusInternalServerError)
 		return
 	}
-	if err := RunGradingJob(gradeReq.JobId, gradeReq.RepoURL, gradeReq.TestRepo, rep); err != nil {
+	if err := RunGradingJob(gradeReq.JobId, gradeReq.RepoURL, gradeReq.TestRepo, rep, slog.Default()); err != nil {
 		http.Error(w, fmt.Sprintf("grading error: %v", err.Error()), http.StatusInternalServerError)
 		return
 	}

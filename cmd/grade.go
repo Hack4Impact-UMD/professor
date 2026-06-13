@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
+
 	"github.com/Hack4Impact-UMD/professor/reporter"
 	"github.com/Hack4Impact-UMD/professor/routes/grade"
 	"github.com/google/uuid"
@@ -31,10 +34,10 @@ func runGrade(cmd *cobra.Command, args []string) error {
 
 	jobId := uuid.New().String()
 
-	// TODO: replace with a real CLIReporter once implemented
 	rep := &reporter.CLIReporter{}
+	silent := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	if err := grade.RunGradingJobLocal(jobId, assessmentRepoPath, testRepoPath, rep); err != nil {
+	if err := grade.RunGradingJobLocal(jobId, assessmentRepoPath, testRepoPath, rep, silent); err != nil {
 		return fmt.Errorf("grading failed: %w", err)
 	}
 

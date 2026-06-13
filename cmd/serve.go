@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -36,7 +36,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	if port == "" {
 		port = "8000"
-		log.Printf("Defaulting to port %s", port)
+		slog.Info("no port configured, defaulting", "port", port)
 	}
 
 	app, err := firebase.GetFirebaseApp(os.Getenv("DEV") == "true")
@@ -59,6 +59,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Handler: mux,
 	}
 
-	log.Printf("Listening on port %s", port)
+	slog.Info("listening", "port", port)
 	return server.ListenAndServe()
 }
