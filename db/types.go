@@ -38,19 +38,23 @@ type SuiteResult struct {
 }
 
 type GradingJobPublic struct {
-	Id             string                  `firestore:"id"`
-	ResponseId     string                  `firestore:"responseId"`
-	RepoURL        string                  `firestore:"repoURL"`
-	Status         string                  `firestore:"status"`
-	Score          float64                 `firestore:"score"`
-	TotalTests     int                     `firestore:"totalTests"`
-	CompletedTests int                     `firestore:"completedTests"`
-	Error          string                  `firestore:"error,omitempty"`
-	Started        time.Time               `firestore:"started"`
-	Completed      time.Time               `firestore:"completed,omitempty"`
-	Updated        time.Time               `firestore:"updated"`
-	SuiteResults   map[string]SuiteResult         `firestore:"suiteResults"` // map of suite name -> public results
-	PublicTests    map[string]map[string]TestResult `firestore:"publicTests"`  // suite name -> test name -> result (public tests only)
+	Id                string                           `firestore:"id"`
+	ResponseId        string                           `firestore:"responseId"`
+	RepoURL           string                           `firestore:"repoURL"`
+	Status            string                           `firestore:"status"`
+	Score             float64                          `firestore:"score"`
+	TotalTests        int                              `firestore:"totalTests"`
+	CompletedTests    int                              `firestore:"completedTests"`
+	Error             string                           `firestore:"error,omitempty"`
+	Started           time.Time                        `firestore:"started"`
+	Completed         time.Time                        `firestore:"completed,omitempty"`
+	Updated           time.Time                        `firestore:"updated"`
+	CloneDurationMs   int64                            `firestore:"cloneDurationMs,omitempty"`
+	InstallDurationMs int64                            `firestore:"installDurationMs,omitempty"`
+	BuildDurationMs   int64                            `firestore:"buildDurationMs,omitempty"`
+	TestingDurationMs int64                            `firestore:"testingDurationMs,omitempty"`
+	SuiteResults      map[string]SuiteResult           `firestore:"suiteResults"`
+	PublicTests       map[string]map[string]TestResult `firestore:"publicTests"`
 }
 
 // other fields can be fetched from GradingJobPublic
