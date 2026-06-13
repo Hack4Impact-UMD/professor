@@ -3,6 +3,7 @@ package reporter
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -10,9 +11,11 @@ import (
 )
 
 type CLIReporter struct {
-	program *tea.Program
-	once    sync.Once
-	wg      sync.WaitGroup
+	program      *tea.Program
+	once         sync.Once
+	wg           sync.WaitGroup
+	installStart time.Time
+	buildStart   time.Time
 }
 
 func (r *CLIReporter) start(jobId string) {
@@ -62,18 +65,20 @@ func (r *CLIReporter) OnCloneEnd(_, _, _ string, err error) {
 func (r *CLIReporter) OnInstallStart(jobId string) {
 	r.start(jobId) // no-op if OnGradeStart already ran; safety net for local mode
 	r.send(msgInstallStart{})
+	r.installStart = time.Now()
 }
 func (r *CLIReporter) OnInstallEnd(_, out string, err error) {
-	r.send(msgInstallEnd{out: out, err: err})
+	r.send(msgInstallEnd{out: out, err: err, duration: time.Now().Sub(r.installStart)})
 	if err != nil {
 		r.wg.Wait()
 	}
 }
 func (r *CLIReporter) OnBuildStart(_ string) {
 	r.send(msgBuildStart{})
+	r.buildStart = time.Now()
 }
 func (r *CLIReporter) OnBuildEnd(_, out string, err error) {
-	r.send(msgBuildEnd{out: out, err: err})
+	r.send(msgBuildEnd{out: out, err: err, duration: time.Now().Sub(r.buildStart)})
 	if err != nil {
 		r.wg.Wait()
 	}
