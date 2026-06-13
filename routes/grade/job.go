@@ -71,6 +71,7 @@ func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string) (c
 }
 
 func RunGradingJobLocal(jobId string, assessmentRepoDir string, testRepoDir string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
+	reporter.OnGradeStart(jobId)
 	return grade(jobId, assessmentRepoDir, testRepoDir, reporter, logger)
 }
 

@@ -35,6 +35,8 @@ func runGrade(cmd *cobra.Command, args []string) error {
 	jobId := uuid.New().String()
 
 	rep := &reporter.CLIReporter{}
+	defer rep.Wait()
+
 	silent := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	if err := grade.RunGradingJobLocal(jobId, assessmentRepoPath, testRepoPath, rep, silent); err != nil {
