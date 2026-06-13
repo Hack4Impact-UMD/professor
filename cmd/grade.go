@@ -11,13 +11,12 @@ import (
 var gradeCmd = &cobra.Command{
 	Use:   "grade <assessment_repo_path> <test_repo_path>",
 	Short: "Run a grading job from the CLI",
-	Long: `Clones the given GitHub repositories, builds the assessment, and runs
-Playwright tests against it. Results are printed to the terminal.
+	Long: `Runs Playwright tests defined in the specified test repo against the specified assessment repo locally. Results are printed to the terminal.
 
 Both arguments are GitHub repository paths in the form "owner/repo".
 
 Example:
-  professor grade my-org/student-submission my-org/assignment-tests`,
+  professor grade ./student-submission ./assignment-tests`,
 	Args: cobra.ExactArgs(2),
 	RunE: runGrade,
 }
@@ -35,7 +34,7 @@ func runGrade(cmd *cobra.Command, args []string) error {
 	// TODO: replace with a real CLIReporter once implemented
 	rep := &reporter.CLIReporter{}
 
-	if err := grade.RunGradingJob(jobId, assessmentRepoPath, testRepoPath, rep); err != nil {
+	if err := grade.RunGradingJobLocal(jobId, assessmentRepoPath, testRepoPath, rep); err != nil {
 		return fmt.Errorf("grading failed: %w", err)
 	}
 

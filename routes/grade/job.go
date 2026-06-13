@@ -70,6 +70,10 @@ func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string) (c
 	}, nil
 }
 
+func RunGradingJobLocal(jobId string, assessmentRepoDir string, testRepoDir string, reporter playwright.GradingJobReporter) error {
+	return grade(jobId, assessmentRepoDir, testRepoDir, reporter)
+}
+
 func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string, reporter playwright.GradingJobReporter) error {
 	log.Println("Running grading job", jobId)
 	reporter.OnGradeStart(jobId)
@@ -82,8 +86,12 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 	}
 	defer os.RemoveAll(clone.GradingDir)
 
+	return grade(jobId, clone.AssessmentDir, clone.TestDir, reporter)
+}
+
+func grade(jobId string, assessmentDir string, testDir string, reporter playwright.GradingJobReporter) error {
 	reporter.OnInstallStart(jobId)
-	installOut, err := builder.InstallAssessmentDeps(clone.AssessmentDir)
+	installOut, err := builder.InstallAssessmentDeps(assessmentDir)
 	reporter.OnInstallEnd(jobId, installOut, err)
 
 	log.Printf("install output: %v", installOut)
@@ -94,7 +102,7 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 	}
 
 	reporter.OnBuildStart(jobId)
-	buildOut, err := builder.BuildAssessment(clone.AssessmentDir)
+	buildOut, err := builder.BuildAssessment(assessmentDir)
 	reporter.OnBuildEnd(jobId, buildOut, err)
 
 	log.Printf("build output: %v", buildOut)
@@ -103,7 +111,7 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 		return err
 	}
 
-	port, stop, err := serve.ServeAssessment(filepath.Join(clone.AssessmentDir, "dist"))
+	port, stop, err := serve.ServeAssessment(filepath.Join(assessmentDir, "dist"))
 
 	if err != nil {
 		reporter.OnServe(jobId, err)
@@ -121,7 +129,7 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 
 	reporter.OnServe(jobId, nil)
 
-	if err := playwright.RunPlaywrightTests(jobId, clone.TestDir, port, reporter); err != nil {
+	if err := playwright.RunPlaywrightTests(jobId, testDir, port, reporter); err != nil {
 		log.Printf("Failed to run playwright tests %v", err)
 		return err
 	}
