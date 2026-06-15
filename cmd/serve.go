@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/Hack4Impact-UMD/professor/firebase"
 	"github.com/Hack4Impact-UMD/professor/routes/grade"
@@ -55,8 +56,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	grade.RegisterHandlers(mux, fsClient)
 
 	server := http.Server{
-		Addr:    ":" + port,
-		Handler: mux,
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	slog.Info("listening", "port", port)

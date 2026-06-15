@@ -69,6 +69,7 @@ type step struct {
 type testEntry struct {
 	displayName string
 	rawName     string
+	points      int
 	status      testStatus
 	durationMs  int64
 	errors      string
@@ -84,11 +85,12 @@ type suiteEntry struct {
 }
 
 type gradingModel struct {
-	jobId     string
-	steps     [4]step
-	suites    []*suiteEntry
-	testIndex map[string]*testEntry // key: suite+"\x00"+rawName
-	frame     int
+	jobId       string
+	steps       [4]step
+	suites      []*suiteEntry
+	testIndex   map[string]*testEntry // key: suite+"\x00"+rawName
+	frame       int
+	testingDone bool
 }
 
 const (
@@ -183,6 +185,7 @@ func (m gradingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				entry := &testEntry{
 					displayName: fmt.Sprintf("[%dpts] %s", t.Points, t.Name),
 					rawName:     raw,
+					points:      t.Points,
 				}
 				suite.tests = append(suite.tests, entry)
 				m.testIndex[s.Name+"\x00"+raw] = entry
@@ -219,6 +222,7 @@ func (m gradingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case msgTestingEnd:
+		m.testingDone = true
 		return m, tea.Quit
 	}
 
@@ -226,10 +230,11 @@ func (m gradingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 var (
-	styleOK   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	styleErr  = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	styleDim  = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	styleBold = lipgloss.NewStyle().Bold(true)
+	styleOK     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	styleErr    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	styleDim    = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	styleBold   = lipgloss.NewStyle().Bold(true)
+	styleBanner = lipgloss.NewStyle().Background(lipgloss.Color("2")).Foreground(lipgloss.Color("0")).Bold(true).Padding(0, 1)
 )
 
 func (m gradingModel) View() string {
@@ -247,7 +252,13 @@ func (m gradingModel) View() string {
 		case stepRunning:
 			sb.WriteString(sp + " " + s.label + "\n")
 		case stepDone:
-			sb.WriteString(styleOK.Render("✓") + " " + s.label + styleDim.Render(fmt.Sprintf(" (%dms)", s.duration.Milliseconds())) + "\n")
+			sb.WriteString(styleOK.Render("✓") + " " + s.label)
+
+			if s.duration.Milliseconds() > 0 {
+				sb.WriteString(styleDim.Render(fmt.Sprintf(" (%dms)", s.duration.Milliseconds())) + "\n")
+			} else {
+				sb.WriteString("\n")
+			}
 			renderLines(&sb, s.output)
 		case stepFailed:
 			sb.WriteString(styleErr.Render("✗") + " " + s.label + "\n")
@@ -296,6 +307,35 @@ func (m gradingModel) View() string {
 					renderLines(&sb, t.stderr)
 				}
 			}
+		}
+	}
+
+	if m.testingDone {
+		var grandEarned, grandTotal int
+		sb.WriteString("\n")
+		sb.WriteString(styleBanner.Render("Grading Finished") + "\n")
+		for _, suite := range m.suites {
+			var earned, total int
+			for _, t := range suite.tests {
+				total += t.points
+				if t.status == testPassed {
+					earned += t.points
+				}
+			}
+			grandEarned += earned
+			grandTotal += total
+			suiteStr := fmt.Sprintf("  %s: %d / %d pts", suite.name, earned, total)
+			if earned == total {
+				sb.WriteString(styleOK.Render(suiteStr) + "\n")
+			} else {
+				sb.WriteString(styleDim.Render(suiteStr) + "\n")
+			}
+		}
+		totalStr := fmt.Sprintf("Total: %d / %d points", grandEarned, grandTotal)
+		if grandEarned == grandTotal {
+			sb.WriteString(styleOK.Render(styleBold.Render(totalStr)) + "\n")
+		} else {
+			sb.WriteString(styleBold.Render(totalStr) + "\n")
 		}
 	}
 

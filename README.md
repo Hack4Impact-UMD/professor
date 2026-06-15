@@ -1,6 +1,6 @@
 # Professor
 
-Professor is Hack4Impact-UMD's technical assessment autograder. It runs Playwright test against assessment submissions and reports results to Firestore (when run as a grading worker) or the terminal (when run locally).
+Professor is Hack4Impact-UMD's technical assessment autograder. It runs Playwright tests against assessment submissions and reports results to Firestore (when run as a grading worker) or the terminal (when run locally).
 
 Professor is integrated as a grading worker for the [Hack4Impact-UMD Application Portal](apply.umd.hack4impact.org). 
 

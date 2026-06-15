@@ -2,6 +2,7 @@ package reporter
 
 import (
 	"errors"
+	"log/slog"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -285,21 +286,21 @@ func (r *FirestoreReporter) OnTestStart(jobId, suite, testName string) {
 }
 
 func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, err error) {
-	var points int
-	if suitePoints, ok := r.testPoints[suite]; ok {
-		points = suitePoints[testName] // defaults to 0 if testName not found
+	meta, err := playwright.ParseTestName(testName)
+	if err != nil {
+		slog.Error("failed to parse test name", "testName", testName)
 	}
 
 	result := db.TestResult{
 		Suite:      suite,
-		TestName:   testName,
+		TestName:   meta.Name,
 		Passed:     passed,
 		Pending:    false,
 		Stdout:     truncateLog(stdout, maxTestOutputBytes),
 		Stderr:     truncateLog(stderr, maxTestOutputBytes),
 		Errors:     testErrors,
 		DurationMs: durationMs,
-		Points:     points,
+		Points:     meta.Points,
 	}
 
 	_ = firebase.UpdateDocFields(r.fsClient, collectionInternal, jobId, []firestore.Update{
@@ -315,7 +316,7 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 	if passed {
 		publicUpdates = append(publicUpdates,
 			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "passed"}, Value: firestore.Increment(1)},
-			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "points"}, Value: firestore.Increment(points)},
+			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "points"}, Value: firestore.Increment(meta.Points)},
 		)
 	} else {
 		publicUpdates = append(publicUpdates,
@@ -323,7 +324,7 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 		)
 	}
 
-	if suitePublic, ok := r.publicTestSet[suite]; ok && suitePublic[testName] {
+	if suitePublic, ok := r.publicTestSet[suite]; ok && suitePublic[meta.Name] {
 		publicUpdates = append(publicUpdates,
 			firestore.Update{FieldPath: firestore.FieldPath{"publicTests", suite, testName}, Value: result},
 		)

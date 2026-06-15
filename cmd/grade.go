@@ -16,7 +16,7 @@ var gradeCmd = &cobra.Command{
 	Short: "Run a grading job from the CLI",
 	Long: `Runs Playwright tests defined in the specified test repo against the specified assessment repo locally. Results are printed to the terminal.
 
-Both arguments are GitHub repository paths in the form "owner/repo".
+Both arguments are local filesystem paths to directories containing the assessment and test repositories.
 
 Example:
   professor grade ./student-submission ./assignment-tests`,

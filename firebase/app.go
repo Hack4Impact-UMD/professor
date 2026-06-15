@@ -2,6 +2,7 @@ package firebase
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -12,7 +13,7 @@ import (
 func GetFirebaseApp(useEmulators bool) (*firebase.App, error) {
 	if os.Getenv("PROJECT_ID") == "" {
 		slog.Error("PROJECT_ID not found in env")
-		os.Exit(1)
+		return nil, fmt.Errorf("PROJECT_ID not found in env")
 	}
 
 	cfg := firebase.Config{
@@ -26,7 +27,7 @@ func GetFirebaseApp(useEmulators bool) (*firebase.App, error) {
 		app, err := firebase.NewApp(context.Background(), &cfg, opt)
 		if err != nil {
 			slog.Error("failed to init firebase app", "err", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("failed to init firebase app")
 		}
 		return app, nil
 	}
@@ -34,7 +35,7 @@ func GetFirebaseApp(useEmulators bool) (*firebase.App, error) {
 	app, err := firebase.NewApp(context.Background(), &cfg)
 	if err != nil {
 		slog.Error("failed to init firebase app", "err", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to init firebase app")
 	}
 
 	return app, nil
