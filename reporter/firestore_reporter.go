@@ -2,6 +2,8 @@ package reporter
 
 import (
 	"errors"
+	"log/slog"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/Hack4Impact-UMD/professor/db"
@@ -21,6 +23,10 @@ type FirestoreReporter struct {
 	fsClient      *firestore.Client
 	publicTestSet map[string]map[string]bool // suite -> testName -> isPublic
 	testPoints    map[string]map[string]int  // suite -> testName -> points
+	cloneStart    time.Time
+	installStart  time.Time
+	buildStart    time.Time
+	testingStart  time.Time
 }
 
 func NewFirestoreReporter(fsClient *firestore.Client) (*FirestoreReporter, error) {
@@ -67,6 +73,7 @@ func (r *FirestoreReporter) OnGradeStart(jobId string) {
 }
 
 func (r *FirestoreReporter) OnCloneStart(jobId, assessmentRepo, testRepo string) {
+	r.cloneStart = time.Now()
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"status":  db.StatusCloning,
 		"updated": firestore.ServerTimestamp,
@@ -78,12 +85,14 @@ func (r *FirestoreReporter) OnCloneStart(jobId, assessmentRepo, testRepo string)
 }
 
 func (r *FirestoreReporter) OnCloneEnd(jobId, assessmentRepo, testRepo string, err error) {
+	cloneDurationMs := time.Since(r.cloneStart).Milliseconds()
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
-			"status":    db.StatusFailed,
-			"error":     err.Error(),
-			"completed": firestore.ServerTimestamp,
-			"updated":   firestore.ServerTimestamp,
+			"status":          db.StatusFailed,
+			"error":           err.Error(),
+			"cloneDurationMs": cloneDurationMs,
+			"completed":       firestore.ServerTimestamp,
+			"updated":         firestore.ServerTimestamp,
 		})
 
 		_ = r.updateInternalDoc(jobId, map[string]any{
@@ -94,11 +103,13 @@ func (r *FirestoreReporter) OnCloneEnd(jobId, assessmentRepo, testRepo string, e
 	}
 
 	_ = r.updatePublicDoc(jobId, map[string]any{
-		"updated": firestore.ServerTimestamp,
+		"cloneDurationMs": cloneDurationMs,
+		"updated":         firestore.ServerTimestamp,
 	})
 }
 
 func (r *FirestoreReporter) OnInstallStart(jobId string) {
+	r.installStart = time.Now()
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"status":  db.StatusInstalling,
 		"updated": firestore.ServerTimestamp,
@@ -106,12 +117,14 @@ func (r *FirestoreReporter) OnInstallStart(jobId string) {
 }
 
 func (r *FirestoreReporter) OnInstallEnd(jobId, out string, err error) {
+	installDurationMs := time.Since(r.installStart).Milliseconds()
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
-			"status":    db.StatusFailed,
-			"error":     err.Error(),
-			"completed": firestore.ServerTimestamp,
-			"updated":   firestore.ServerTimestamp,
+			"status":            db.StatusFailed,
+			"error":             err.Error(),
+			"installDurationMs": installDurationMs,
+			"completed":         firestore.ServerTimestamp,
+			"updated":           firestore.ServerTimestamp,
 		})
 
 		_ = r.updateInternalDoc(jobId, map[string]any{
@@ -123,7 +136,8 @@ func (r *FirestoreReporter) OnInstallEnd(jobId, out string, err error) {
 	}
 
 	_ = r.updatePublicDoc(jobId, map[string]any{
-		"updated": firestore.ServerTimestamp,
+		"installDurationMs": installDurationMs,
+		"updated":           firestore.ServerTimestamp,
 	})
 
 	_ = r.updateInternalDoc(jobId, map[string]any{
@@ -132,6 +146,7 @@ func (r *FirestoreReporter) OnInstallEnd(jobId, out string, err error) {
 }
 
 func (r *FirestoreReporter) OnBuildStart(jobId string) {
+	r.buildStart = time.Now()
 	_ = r.updatePublicDoc(jobId, map[string]any{
 		"status":  db.StatusBuilding,
 		"updated": firestore.ServerTimestamp,
@@ -139,12 +154,14 @@ func (r *FirestoreReporter) OnBuildStart(jobId string) {
 }
 
 func (r *FirestoreReporter) OnBuildEnd(jobId, out string, err error) {
+	buildDurationMs := time.Since(r.buildStart).Milliseconds()
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
-			"status":    db.StatusFailed,
-			"error":     err.Error(),
-			"completed": firestore.ServerTimestamp,
-			"updated":   firestore.ServerTimestamp,
+			"status":          db.StatusFailed,
+			"error":           err.Error(),
+			"buildDurationMs": buildDurationMs,
+			"completed":       firestore.ServerTimestamp,
+			"updated":         firestore.ServerTimestamp,
 		})
 
 		_ = r.updateInternalDoc(jobId, map[string]any{
@@ -156,7 +173,8 @@ func (r *FirestoreReporter) OnBuildEnd(jobId, out string, err error) {
 	}
 
 	_ = r.updatePublicDoc(jobId, map[string]any{
-		"updated": firestore.ServerTimestamp,
+		"buildDurationMs": buildDurationMs,
+		"updated":         firestore.ServerTimestamp,
 	})
 
 	_ = r.updateInternalDoc(jobId, map[string]any{
@@ -187,6 +205,7 @@ func (r *FirestoreReporter) OnServe(jobId string, err error) {
 }
 
 func (r *FirestoreReporter) OnTestingStart(jobId string, repo playwright.TestRepo, err error) {
+	r.testingStart = time.Now()
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":    db.StatusFailed,
@@ -267,21 +286,21 @@ func (r *FirestoreReporter) OnTestStart(jobId, suite, testName string) {
 }
 
 func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, err error) {
-	var points int
-	if suitePoints, ok := r.testPoints[suite]; ok {
-		points = suitePoints[testName] // defaults to 0 if testName not found
+	meta, err := playwright.ParseTestName(testName)
+	if err != nil {
+		slog.Error("failed to parse test name", "testName", testName)
 	}
 
 	result := db.TestResult{
 		Suite:      suite,
-		TestName:   testName,
+		TestName:   meta.Name,
 		Passed:     passed,
 		Pending:    false,
 		Stdout:     truncateLog(stdout, maxTestOutputBytes),
 		Stderr:     truncateLog(stderr, maxTestOutputBytes),
 		Errors:     testErrors,
 		DurationMs: durationMs,
-		Points:     points,
+		Points:     meta.Points,
 	}
 
 	_ = firebase.UpdateDocFields(r.fsClient, collectionInternal, jobId, []firestore.Update{
@@ -297,7 +316,7 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 	if passed {
 		publicUpdates = append(publicUpdates,
 			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "passed"}, Value: firestore.Increment(1)},
-			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "points"}, Value: firestore.Increment(points)},
+			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "points"}, Value: firestore.Increment(meta.Points)},
 		)
 	} else {
 		publicUpdates = append(publicUpdates,
@@ -305,7 +324,7 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 		)
 	}
 
-	if suitePublic, ok := r.publicTestSet[suite]; ok && suitePublic[testName] {
+	if suitePublic, ok := r.publicTestSet[suite]; ok && suitePublic[meta.Name] {
 		publicUpdates = append(publicUpdates,
 			firestore.Update{FieldPath: firestore.FieldPath{"publicTests", suite, testName}, Value: result},
 		)
@@ -315,12 +334,14 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 }
 
 func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
+	testingDurationMs := time.Since(r.testingStart).Milliseconds()
 	if err != nil {
 		_ = r.updatePublicDoc(jobId, map[string]any{
-			"status":    db.StatusFailed,
-			"error":     err.Error(),
-			"completed": firestore.ServerTimestamp,
-			"updated":   firestore.ServerTimestamp,
+			"status":            db.StatusFailed,
+			"error":             err.Error(),
+			"testingDurationMs": testingDurationMs,
+			"completed":         firestore.ServerTimestamp,
+			"updated":           firestore.ServerTimestamp,
 		})
 
 		_ = r.updateInternalDoc(jobId, map[string]any{
@@ -331,9 +352,10 @@ func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
 	}
 
 	_ = r.updatePublicDoc(jobId, map[string]any{
-		"status":    db.StatusCompleted,
-		"completed": firestore.ServerTimestamp,
-		"updated":   firestore.ServerTimestamp,
+		"status":            db.StatusCompleted,
+		"testingDurationMs": testingDurationMs,
+		"completed":         firestore.ServerTimestamp,
+		"updated":           firestore.ServerTimestamp,
 	})
 }
 

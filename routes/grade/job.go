@@ -2,7 +2,7 @@ package grade
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -70,8 +70,13 @@ func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string) (c
 	}, nil
 }
 
-func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string, reporter playwright.GradingJobReporter) error {
-	log.Println("Running grading job", jobId)
+func RunGradingJobLocal(jobId string, assessmentRepoDir string, testRepoDir string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
+	reporter.OnGradeStart(jobId)
+	return grade(jobId, assessmentRepoDir, testRepoDir, reporter, logger)
+}
+
+func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
+	logger.Info("running grading job", "jobId", jobId)
 	reporter.OnGradeStart(jobId)
 
 	reporter.OnCloneStart(jobId, assessmentRepoPath, testRepoPath)
@@ -82,51 +87,45 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 	}
 	defer os.RemoveAll(clone.GradingDir)
 
+	return grade(jobId, clone.AssessmentDir, clone.TestDir, reporter, logger)
+}
+
+func grade(jobId string, assessmentDir string, testDir string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
 	reporter.OnInstallStart(jobId)
-	installOut, err := builder.InstallAssessmentDeps(clone.AssessmentDir)
+	installOut, err := builder.InstallAssessmentDeps(assessmentDir)
 	reporter.OnInstallEnd(jobId, installOut, err)
-
-	log.Printf("install output: %v", installOut)
-
 	if err != nil {
-		log.Printf("Install failed: %v", err)
 		return err
 	}
 
 	reporter.OnBuildStart(jobId)
-	buildOut, err := builder.BuildAssessment(clone.AssessmentDir)
+	buildOut, err := builder.BuildAssessment(assessmentDir)
 	reporter.OnBuildEnd(jobId, buildOut, err)
-
-	log.Printf("build output: %v", buildOut)
 	if err != nil {
-		log.Printf("Build failed: %v", err)
 		return err
 	}
 
-	port, stop, err := serve.ServeAssessment(filepath.Join(clone.AssessmentDir, "dist"))
-
+	port, stop, err := serve.ServeAssessment(filepath.Join(assessmentDir, "dist"))
 	if err != nil {
 		reporter.OnServe(jobId, err)
-		log.Printf("Serve failed on port %d: %v", port, err)
+		logger.Error("serve failed", "port", port, "err", err)
 		return err
 	}
-
 	defer stop()
 
 	if err := util.WaitForPort(port, 5*time.Second); err != nil {
 		reporter.OnServe(jobId, err)
-		log.Printf("File server did not respond in 5 seconds!")
+		logger.Error("file server did not respond within timeout", "port", port)
 		return err
 	}
 
 	reporter.OnServe(jobId, nil)
 
-	if err := playwright.RunPlaywrightTests(jobId, clone.TestDir, port, reporter); err != nil {
-		log.Printf("Failed to run playwright tests %v", err)
+	if err := playwright.RunPlaywrightTests(jobId, testDir, port, reporter); err != nil {
+		logger.Error("playwright tests failed", "jobId", jobId, "err", err)
 		return err
 	}
 
-	log.Printf("Tests run successfully for job %v", jobId)
-
+	logger.Info("grading complete", "jobId", jobId)
 	return nil
 }

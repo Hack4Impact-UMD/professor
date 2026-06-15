@@ -11,7 +11,7 @@ RUN go mod download
 
 # copy and build code
 COPY . .
-RUN go build -mod=readonly -v -o server .
+RUN go build -mod=readonly -v -o professor .
 
 # start runtime stage
 # adds ca-certificates for HTTPS; git for cloning repos;
@@ -41,5 +41,5 @@ RUN npx playwright install --with-deps chromium \
 WORKDIR /app
 
 # copy image to production and run binary
-COPY --from=builder /app/server ./server
-CMD ["./server"]
+COPY --from=builder /app/professor ./professor
+CMD ["./professor", "serve"]

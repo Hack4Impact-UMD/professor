@@ -1,6 +1,20 @@
 # Professor
 
-Worker for the [Hack4Impact-UMD App Portal](apply.umd.hack4impact.org) assessment autograder.
+Professor is Hack4Impact-UMD's technical assessment autograder. It runs Playwright tests against assessment submissions and reports results to Firestore (when run as a grading worker) or the terminal (when run locally).
+
+Professor is integrated as a grading worker for the [Hack4Impact-UMD Application Portal](apply.umd.hack4impact.org). 
+
+## CLI Usage
+
+```
+professor grade <assessment_repo_path> <test_repo_path>
+```
+Runs Playwright tests against a submission locally and prints results to the terminal.
+
+```
+professor serve [--port|-p <port>]
+```
+Starts the HTTP grading server. Port defaults to `$PORT` or `8000`. Requires Firebase credentials.
 
 ## Architecture
 
@@ -62,3 +76,4 @@ make docker-run
 **Make sure you have a .env file in the root directory with `PROJECT_ID` set correctly, and `DEV=true` in order to connect to the firestore emulator**
 
 And now `http://localhost:8000` on your machine should be live!
+
