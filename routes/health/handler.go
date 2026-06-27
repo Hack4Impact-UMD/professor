@@ -7,22 +7,22 @@ import (
 
 type healthResponse struct {
 	Status        string `json:"status"`
-	BunAvailable  bool   `json:"bunAvailable"`
+	PnpmAvailable bool   `json:"pnpmAvailable"`
 	NodeAvailable bool   `json:"nodeAvailable"`
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
-	bunExists := util.CommandExists("bun")
+	pnpmExists := util.CommandExists("pnpm")
 	nodeExists := util.CommandExists("node")
 	status := "DOWN"
 
-	if bunExists && nodeExists {
+	if pnpmExists && nodeExists {
 		status = "OK"
 	}
 
 	util.JSON(w, healthResponse{
 		Status:        status,
-		BunAvailable:  bunExists,
+		PnpmAvailable: pnpmExists,
 		NodeAvailable: nodeExists,
 	})
 }

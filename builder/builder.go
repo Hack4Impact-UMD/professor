@@ -7,7 +7,7 @@ import (
 )
 
 func InstallAssessmentDeps(assessmentDir string) (string, error) {
-	cmd := exec.Command("bun", "install")
+	cmd := exec.Command("pnpm", "install")
 	cmd.Dir = assessmentDir
 	cmd.Env = util.SandboxedEnv()
 
@@ -21,7 +21,7 @@ func InstallAssessmentDeps(assessmentDir string) (string, error) {
 }
 
 func BuildAssessment(assessmentDir string) (string, error) {
-	cmd := exec.Command("bun", "run", "build")
+	cmd := exec.Command("pnpm", "run", "build")
 	cmd.Dir = assessmentDir
 	cmd.Env = util.SandboxedEnv()
 

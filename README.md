@@ -46,7 +46,7 @@ graph TB
 
 - **Language**: Go
 - **Runtime**: Node
-- **Package Manager**: Bun
+- **Package Manager**: pnpm
 - **Testing**: Playwright
 - **Database**: Firestore
 - **Deployment**: Docker, Google Cloud Run
