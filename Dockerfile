@@ -33,7 +33,7 @@ RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # install pnpm as the JS package manager (runs on the copied Node, no large binary)
-RUN npm install -g pnpm@10 \
+RUN npm install -g pnpm@11 \
     && npm cache clean --force
 
 # pre-install Playwright Chromium and all required OS dependencies
