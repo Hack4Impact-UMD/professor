@@ -15,7 +15,7 @@ RUN go build -mod=readonly -v -o professor .
 # start runtime stage
 # adds ca-certificates for HTTPS; git for cloning repos;
 # copies node and npm/npx from the official image, then installs pnpm via npm;
-# pre-installs Playwright Chromium and its OS dependencies
+# pre-installs Playwright chromium-headless-shell and its OS dependencies
 FROM debian:trixie-slim
 
 RUN set -x && apt-get update && apt-get install -y \
@@ -36,8 +36,12 @@ RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 RUN npm install -g pnpm@11 \
     && npm cache clean --force
 
-# pre-install Playwright Chromium and all required OS dependencies
-RUN npx playwright install --with-deps chromium \
+# pre-install Playwright chromium-headless-shell (headless-only, smaller than full
+# Chromium) and all required OS dependencies. Grading always runs headless, and a
+# chromium project without an explicit `channel` resolves to the headless shell
+# (Playwright v1.49+). NOTE: grader-controlled test configs must NOT set
+# `channel: 'chromium'`, since the full headed browser is intentionally not installed.
+RUN npx playwright install --with-deps --only-shell chromium \
     && npm cache clean --force
 
 WORKDIR /app
