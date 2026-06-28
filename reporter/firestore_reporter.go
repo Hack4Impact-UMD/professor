@@ -317,6 +317,7 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 		publicUpdates = append(publicUpdates,
 			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "passed"}, Value: firestore.Increment(1)},
 			firestore.Update{FieldPath: firestore.FieldPath{"suiteResults", suite, "points"}, Value: firestore.Increment(meta.Points)},
+			firestore.Update{FieldPath: firestore.FieldPath{"score"}, Value: firestore.Increment(meta.Points)},
 		)
 	} else {
 		publicUpdates = append(publicUpdates,
@@ -359,7 +360,7 @@ func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
 	})
 
 	_ = r.updateInternalDoc(jobId, map[string]any{
-		"status":  db.StatusCompleted,
+		"status":  db.StatusTesting,
 		"updated": firestore.ServerTimestamp,
 	})
 }
