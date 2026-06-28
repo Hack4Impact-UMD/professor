@@ -54,7 +54,7 @@ jobs:
           image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}
           env_vars: |-
             PROJECT_ID="h4i-applications"
-          flags: '--cpu=2 --memory=4Gi --concurrency=1 --max-instances=10 --timeout=900'
+          flags: '--cpu=2 --memory=4Gi --concurrency=1 --max-instances=10 --timeout=900 --service-account=professor-service@h4i-applications.iam.gserviceaccount.com --set-secrets=GITHUB_PAT=PROFESSOR_GITHUB_PAT:latest'
 
       - name: Show Output
         run: echo ${{ steps.deploy.outputs.url }}
