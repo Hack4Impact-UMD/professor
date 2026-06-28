@@ -90,6 +90,7 @@ func (r *FirestoreReporter) OnCloneEnd(jobId, assessmentRepo, testRepo string, e
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":          db.StatusFailed,
 			"error":           err.Error(),
+			"errorStep":       "clone",
 			"cloneDurationMs": cloneDurationMs,
 			"completed":       firestore.ServerTimestamp,
 			"updated":         firestore.ServerTimestamp,
@@ -122,6 +123,7 @@ func (r *FirestoreReporter) OnInstallEnd(jobId, out string, err error) {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":            db.StatusFailed,
 			"error":             err.Error(),
+			"errorStep":         "install",
 			"installDurationMs": installDurationMs,
 			"completed":         firestore.ServerTimestamp,
 			"updated":           firestore.ServerTimestamp,
@@ -159,6 +161,7 @@ func (r *FirestoreReporter) OnBuildEnd(jobId, out string, err error) {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":          db.StatusFailed,
 			"error":           err.Error(),
+			"errorStep":       "build",
 			"buildDurationMs": buildDurationMs,
 			"completed":       firestore.ServerTimestamp,
 			"updated":         firestore.ServerTimestamp,
@@ -187,6 +190,7 @@ func (r *FirestoreReporter) OnServe(jobId string, err error) {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":    db.StatusFailed,
 			"error":     err.Error(),
+			"errorStep": "serve",
 			"completed": firestore.ServerTimestamp,
 			"updated":   firestore.ServerTimestamp,
 		})
@@ -210,6 +214,7 @@ func (r *FirestoreReporter) OnTestingStart(jobId string, repo playwright.TestRep
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":    db.StatusFailed,
 			"error":     err.Error(),
+			"errorStep": "testing",
 			"completed": firestore.ServerTimestamp,
 			"updated":   firestore.ServerTimestamp,
 		})
@@ -340,6 +345,7 @@ func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
 		_ = r.updatePublicDoc(jobId, map[string]any{
 			"status":            db.StatusFailed,
 			"error":             err.Error(),
+			"errorStep":         "testing",
 			"testingDurationMs": testingDurationMs,
 			"completed":         firestore.ServerTimestamp,
 			"updated":           firestore.ServerTimestamp,
