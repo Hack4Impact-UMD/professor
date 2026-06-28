@@ -6,9 +6,9 @@ import (
 	"github.com/Hack4Impact-UMD/professor/util"
 )
 
-func InstallAssessmentDeps(assessmentDir string) (string, error) {
+func InstallDeps(repoDir string) (string, error) {
 	cmd := exec.Command("pnpm", "install")
-	cmd.Dir = assessmentDir
+	cmd.Dir = repoDir
 	cmd.Env = util.SandboxedEnv()
 
 	out, err := cmd.CombinedOutput()

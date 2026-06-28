@@ -2,6 +2,7 @@ package grade
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -90,10 +91,28 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 	return grade(jobId, clone.AssessmentDir, clone.TestDir, reporter, logger)
 }
 
+func installDeps(assessmentDir string, testDir string) (string, string, error) {
+	dirs := [2]string{assessmentDir, testDir}
+	outs := [2]string{}
+
+	var wg errgroup.Group
+	for i, dir := range dirs {
+		wg.Go(func() error {
+			out, err := builder.InstallDeps(dir)
+			outs[i] = out
+			return err
+		})
+	}
+
+	err := wg.Wait()
+	return outs[0], outs[1], err
+}
+
 func grade(jobId string, assessmentDir string, testDir string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
 	reporter.OnInstallStart(jobId)
-	installOut, err := builder.InstallAssessmentDeps(assessmentDir)
-	reporter.OnInstallEnd(jobId, installOut, err)
+
+	assessmentInstallOut, testInstallOut, err := installDeps(assessmentDir, testDir)
+	reporter.OnInstallEnd(jobId, fmt.Sprintf("Assessment:\n%s\nTests:\n%s", assessmentInstallOut, testInstallOut), err)
 	if err != nil {
 		return err
 	}
