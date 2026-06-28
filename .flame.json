@@ -1,0 +1,6 @@
+{
+  "project": "h4i-applications",
+  "emulatorHost": "localhost",
+  "emulatorPort": 8080,
+  "useEmulator": true
+}

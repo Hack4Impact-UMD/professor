@@ -304,7 +304,7 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 	}
 
 	_ = firebase.UpdateDocFields(r.fsClient, collectionInternal, jobId, []firestore.Update{
-		{FieldPath: firestore.FieldPath{"tests", suite, testName}, Value: result},
+		{FieldPath: firestore.FieldPath{"tests", suite, meta.Name}, Value: result},
 	})
 
 	publicUpdates := []firestore.Update{
@@ -326,7 +326,7 @@ func (r *FirestoreReporter) OnTestEnd(jobId, suite, testName string, passed bool
 
 	if suitePublic, ok := r.publicTestSet[suite]; ok && suitePublic[meta.Name] {
 		publicUpdates = append(publicUpdates,
-			firestore.Update{FieldPath: firestore.FieldPath{"publicTests", suite, testName}, Value: result},
+			firestore.Update{FieldPath: firestore.FieldPath{"publicTests", suite, meta.Name}, Value: result},
 		)
 	}
 
@@ -356,6 +356,11 @@ func (r *FirestoreReporter) OnTestingEnd(jobId string, err error) {
 		"testingDurationMs": testingDurationMs,
 		"completed":         firestore.ServerTimestamp,
 		"updated":           firestore.ServerTimestamp,
+	})
+
+	_ = r.updateInternalDoc(jobId, map[string]any{
+		"status":  db.StatusCompleted,
+		"updated": firestore.ServerTimestamp,
 	})
 }
 
