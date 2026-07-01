@@ -64,7 +64,7 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 
 	cmd := exec.CommandContext(ctx, "npx", "playwright", "test", "--reporter="+reporterFile.Name())
 	cmd.Dir = testDir
-	cmd.Env = append(util.SandboxedEnv(), fmt.Sprintf("BASE_URL=http://localhost:%v", port))
+	cmd.Env = append(util.SandboxedCommandEnv(), fmt.Sprintf("BASE_URL=http://localhost:%v", port))
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
