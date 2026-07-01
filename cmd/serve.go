@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Hack4Impact-UMD/professor/firebase"
+	"github.com/Hack4Impact-UMD/professor/middleware"
 	"github.com/Hack4Impact-UMD/professor/routes/grade"
 	"github.com/Hack4Impact-UMD/professor/routes/health"
 	"github.com/spf13/cobra"
@@ -31,6 +32,10 @@ func init() {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
+	if os.Getenv("DEV") != "true" {
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+	}
+
 	port := servePort
 	if port == "" {
 		port = os.Getenv("PORT")
@@ -57,7 +62,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	server := http.Server{
 		Addr:              ":" + port,
-		Handler:           mux,
+		Handler:           middleware.LoggingMiddleware(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
