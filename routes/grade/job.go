@@ -28,7 +28,7 @@ func cloneWithSizeCheck(path string, dest string, pat string) error {
 	size, err := git.GetRepoSizeKB(path)
 
 	if err != nil {
-		return errors.New("failed to get repo details")
+		return fmt.Errorf("failed to get repo details: %w", err)
 	}
 
 	if size > MAX_REPO_SIZE_MB*1024 {
@@ -38,7 +38,7 @@ func cloneWithSizeCheck(path string, dest string, pat string) error {
 	return git.CloneRepo(path, dest, pat)
 }
 
-func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string) (cloneResult, error) {
+func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string, logger *slog.Logger) (cloneResult, error) {
 	pat := os.Getenv("GITHUB_PAT")
 
 	gradingDir, err := os.MkdirTemp("", "job-*")
@@ -52,17 +52,29 @@ func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string) (c
 	assessmentDir := filepath.Join(gradingDir, "assessment")
 	testDir := filepath.Join(gradingDir, "tests")
 
+	logger.Info("cloning repos", "jobId", jobId, "assessmentRepo", assessmentRepoPath, "testRepo", testRepoPath, "dir", gradingDir)
+
 	wg.Go(func() error {
-		return cloneWithSizeCheck(assessmentRepoPath, assessmentDir, pat)
+		if err := cloneWithSizeCheck(assessmentRepoPath, assessmentDir, pat); err != nil {
+			logger.Error("assessment clone failed", "jobId", jobId, "repo", assessmentRepoPath, "err", err)
+			return err
+		}
+		return nil
 	})
 	wg.Go(func() error {
-		return cloneWithSizeCheck(testRepoPath, testDir, pat)
+		if err := cloneWithSizeCheck(testRepoPath, testDir, pat); err != nil {
+			logger.Error("test repo clone failed", "jobId", jobId, "repo", testRepoPath, "err", err)
+			return err
+		}
+		return nil
 	})
 
 	if err := wg.Wait(); err != nil {
 		os.RemoveAll(gradingDir)
 		return cloneResult{}, err
 	}
+
+	logger.Info("repos cloned", "jobId", jobId, "assessmentDir", assessmentDir, "testDir", testDir)
 
 	return cloneResult{
 		GradingDir:    gradingDir,
@@ -81,7 +93,7 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 	reporter.OnGradeStart(jobId)
 
 	reporter.OnCloneStart(jobId, assessmentRepoPath, testRepoPath)
-	clone, err := cloneRepos(jobId, assessmentRepoPath, testRepoPath)
+	clone, err := cloneRepos(jobId, assessmentRepoPath, testRepoPath, logger)
 	reporter.OnCloneEnd(jobId, assessmentRepoPath, testRepoPath, err)
 	if err != nil {
 		return err
@@ -91,15 +103,19 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 	return grade(jobId, clone.AssessmentDir, clone.TestDir, reporter, logger)
 }
 
-func installDeps(assessmentDir string, testDir string) (string, string, error) {
+func installDeps(assessmentDir string, testDir string, logger *slog.Logger) (string, string, error) {
 	dirs := [2]string{assessmentDir, testDir}
 	outs := [2]string{}
 
 	var wg errgroup.Group
 	for i, dir := range dirs {
 		wg.Go(func() error {
+			logger.Info("installing deps", "dir", dir)
 			out, err := builder.InstallDeps(dir)
 			outs[i] = out
+			if err != nil {
+				logger.Error("dep install failed", "dir", dir, "output", out, "err", err)
+			}
 			return err
 		})
 	}
@@ -109,38 +125,45 @@ func installDeps(assessmentDir string, testDir string) (string, string, error) {
 }
 
 func grade(jobId string, assessmentDir string, testDir string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
+	logger.Info("installing dependencies", "jobId", jobId)
 	reporter.OnInstallStart(jobId)
 
-	assessmentInstallOut, testInstallOut, err := installDeps(assessmentDir, testDir)
+	assessmentInstallOut, testInstallOut, err := installDeps(assessmentDir, testDir, logger)
 	reporter.OnInstallEnd(jobId, fmt.Sprintf("Assessment:\n%s\nTests:\n%s", assessmentInstallOut, testInstallOut), err)
 	if err != nil {
 		return err
 	}
+	logger.Info("dependencies installed", "jobId", jobId)
 
+	logger.Info("building assessment", "jobId", jobId)
 	reporter.OnBuildStart(jobId)
 	buildOut, err := builder.BuildAssessment(assessmentDir)
 	reporter.OnBuildEnd(jobId, buildOut, err)
 	if err != nil {
+		logger.Error("build failed", "jobId", jobId, "output", buildOut, "err", err)
 		return err
 	}
+	logger.Info("assessment built", "jobId", jobId)
 
 	port, stop, err := serve.ServeAssessment(filepath.Join(assessmentDir, "dist"))
 	if err != nil {
 		reporter.OnServe(jobId, err)
-		logger.Error("serve failed", "port", port, "err", err)
+		logger.Error("serve failed", "jobId", jobId, "err", err)
 		return err
 	}
 	defer stop()
+	logger.Info("serving assessment", "jobId", jobId, "port", port)
 
 	if err := util.WaitForPort(port, 5*time.Second); err != nil {
 		reporter.OnServe(jobId, err)
-		logger.Error("file server did not respond within timeout", "port", port)
+		logger.Error("file server did not respond within timeout", "jobId", jobId, "port", port)
 		return err
 	}
+	logger.Info("assessment server ready", "jobId", jobId, "port", port)
 
 	reporter.OnServe(jobId, nil)
 
-	if err := playwright.RunPlaywrightTests(jobId, testDir, port, reporter); err != nil {
+	if err := playwright.RunPlaywrightTests(jobId, testDir, port, reporter, logger); err != nil {
 		logger.Error("playwright tests failed", "jobId", jobId, "err", err)
 		return err
 	}
