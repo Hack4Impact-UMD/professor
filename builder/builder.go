@@ -9,7 +9,7 @@ import (
 func InstallDeps(repoDir string) (string, error) {
 	cmd := exec.Command("pnpm", "install")
 	cmd.Dir = repoDir
-	cmd.Env = util.SandboxedEnv()
+	cmd.Env = util.SandboxedCommandEnv()
 
 	out, err := cmd.CombinedOutput()
 
@@ -23,7 +23,7 @@ func InstallDeps(repoDir string) (string, error) {
 func BuildAssessment(assessmentDir string) (string, error) {
 	cmd := exec.Command("pnpm", "run", "build")
 	cmd.Dir = assessmentDir
-	cmd.Env = util.SandboxedEnv()
+	cmd.Env = util.SandboxedCommandEnv()
 
 	out, err := cmd.CombinedOutput()
 
