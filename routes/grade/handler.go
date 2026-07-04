@@ -40,7 +40,12 @@ func GradeHandler(w http.ResponseWriter, r *http.Request, fsClient *firestore.Cl
 	}
 	if err := RunGradingJob(gradeReq.JobId, gradeReq.RepoURL, gradeReq.TestRepo, rep, slog.Default()); err != nil {
 		slog.Default().Error("grading job failed", "jobId", gradeReq.JobId, "err", err)
-		http.Error(w, fmt.Sprintf("grading error: %v", err.Error()), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "failed",
+			"error":  err.Error(),
+		})
 		return
 	}
 
