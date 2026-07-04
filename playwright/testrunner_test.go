@@ -1,6 +1,8 @@
 package playwright
 
 import (
+	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -103,7 +105,8 @@ func TestRunPlaywrightTests(t *testing.T) {
 	}
 
 	rep := &mockReporter{}
-	if err := RunPlaywrightTests("test-job", testDir, port, rep); err != nil {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if err := RunPlaywrightTests("test-job", testDir, port, rep, logger); err != nil {
 		t.Fatalf("RunPlaywrightTests() error = %v", err)
 	}
 
