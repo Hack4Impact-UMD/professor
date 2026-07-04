@@ -6,7 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"time"
@@ -39,9 +39,10 @@ func extractTestRepo(testDir string) (TestRepo, error) {
 	return ParseTestRepo(out)
 }
 
-func RunPlaywrightTests(jobId string, testDir string, port int, reporter GradingJobReporter) error {
+func RunPlaywrightTests(jobId string, testDir string, port int, reporter GradingJobReporter, logger *slog.Logger) error {
 	repo, err := extractTestRepo(testDir)
 	if err != nil {
+		logger.Error("failed to extract test repo", "jobId", jobId, "err", err)
 		reporter.OnTestingStart(jobId, TestRepo{}, err)
 		return err
 	}
@@ -64,7 +65,7 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 
 	cmd := exec.CommandContext(ctx, "npx", "playwright", "test", "--reporter="+reporterFile.Name())
 	cmd.Dir = testDir
-	cmd.Env = append(util.SandboxedEnv(), fmt.Sprintf("BASE_URL=http://localhost:%v", port))
+	cmd.Env = append(util.SandboxedCommandEnv(), fmt.Sprintf("BASE_URL=http://localhost:%v", port))
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -73,10 +74,12 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 	}
 
 	if err := cmd.Start(); err != nil {
+		logger.Error("failed to start playwright", "jobId", jobId, "err", err)
 		reporter.OnTestingStart(jobId, repo, err)
 		return err
 	}
 
+	logger.Info("running playwright tests", "jobId", jobId, "testDir", testDir, "port", port)
 	reporter.OnTestingStart(jobId, repo, nil)
 
 	scanner := bufio.NewScanner(stdout)
@@ -112,7 +115,7 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Printf("Scanner error when reading playwright output: %v", err)
+		logger.Error("scanner error reading playwright output", "jobId", jobId, "err", err)
 		reporter.OnTestingEnd(jobId, err)
 		return err
 	}
@@ -123,5 +126,6 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 		}
 	}
 
+	logger.Info("playwright tests complete", "jobId", jobId)
 	return nil
 }

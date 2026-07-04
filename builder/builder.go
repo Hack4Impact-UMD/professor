@@ -10,7 +10,7 @@ import (
 func InstallDeps(repoDir string) (string, error) {
 	cmd := exec.Command("pnpm", "install")
 	cmd.Dir = repoDir
-	cmd.Env = util.SandboxedEnv()
+	cmd.Env = util.SandboxedCommandEnv()
 
 	out, err := cmd.CombinedOutput()
 

@@ -43,3 +43,12 @@ func SandboxedEnv() []string {
 	}
 	return filtered
 }
+
+func SandboxedCommandEnv() []string {
+	env := SandboxedEnv()
+	return append(env,
+		"FORCE_COLOR=1",
+		"TERM=xterm-256color",
+		"COLORTERM=truecolor",
+	)
+}
