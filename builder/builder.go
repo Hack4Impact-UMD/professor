@@ -2,6 +2,7 @@ package builder
 
 import (
 	"os/exec"
+	"path/filepath"
 
 	"github.com/Hack4Impact-UMD/professor/util"
 )
@@ -21,15 +22,28 @@ func InstallDeps(repoDir string) (string, error) {
 }
 
 func BuildAssessment(assessmentDir string) (string, error) {
-	cmd := exec.Command("pnpm", "run", "build")
-	cmd.Dir = assessmentDir
-	cmd.Env = util.SandboxedEnv()
+	binDir := filepath.Join(assessmentDir, "node_modules", ".bin")
 
-	out, err := cmd.CombinedOutput()
+	tscCmd := exec.Command(filepath.Join(binDir, "tsc"), "-b")
+	tscCmd.Dir = assessmentDir
+	tscCmd.Env = util.SandboxedEnv()
 
+	tscOut, err := tscCmd.CombinedOutput()
 	if err != nil {
-		return string(out), err
+		return string(tscOut), err
 	}
 
-	return string(out), nil
+	viteCmd := exec.Command(filepath.Join(binDir, "vite"), "build")
+	viteCmd.Dir = assessmentDir
+	viteCmd.Env = util.SandboxedEnv()
+
+	viteOut, err := viteCmd.CombinedOutput()
+
+	out := string(tscOut) + string(viteOut)
+
+	if err != nil {
+		return out, err
+	}
+
+	return out, nil
 }
