@@ -153,7 +153,7 @@ func grade(jobId string, assessmentDir string, testDir string, reporter playwrig
 
 	logger.Info("building assessment", "jobId", jobId)
 	reporter.OnBuildStart(jobId)
-	buildOut, err := builder.BuildAssessment(assessmentDir)
+	buildOut, err := builder.BuildAssessment(assessmentDir, testDir)
 	reporter.OnBuildEnd(jobId, buildOut, err)
 	if err != nil {
 		logger.Error("build failed", "jobId", jobId, "output", buildOut, "err", err)

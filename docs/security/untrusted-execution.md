@@ -49,6 +49,51 @@ reporter split (below) is recorded as future work.
   trees are cloned into **separate temp roots**, not siblings under one parent,
   removing the naive `../tests` traversal. The assessment is exposed to the tests
   only as static files over HTTP, never imported into the test process.
+- **Reduced Node-side execution surface** (`builder/builder.go`):
+  - `pnpm install` runs with `--ignore-scripts`, blocking the assessment's root
+    lifecycle scripts (`preinstall`/`install`/`postinstall`/`prepare`) — the
+    dominant Node-side RCE vector.
+  - Before building, the trusted test repo's `build_config/` directory is
+    overlaid onto the assessment, so the build runs against grader-controlled
+    config (`vite.config`, `tsconfig`, `postcss`/`tailwind` config, …) instead of
+    the submission's own, which would otherwise execute as Node code during the
+    build. Symlinks in the overlay are skipped so it can't redirect writes.
+
+  See "Why Node-side execution is the real risk" below.
+
+### Why Node-side execution is the real risk (and browser-side isn't)
+
+Attacker code runs in two places: **Node** (during `pnpm install` and
+`vite build`) and the **browser** (the built app, loaded by Playwright). Only the
+Node side is a practical credential-theft vector:
+
+- The **browser** app can *attempt* to `fetch` the metadata endpoint, but the
+  metadata server requires the `Metadata-Flavor: Google` request header (a custom
+  header, which triggers a CORS preflight the metadata server rejects) and returns
+  no CORS headers, so browser JS cannot read a token response. The headless
+  browser also has no access to the container filesystem or the PAT. So
+  browser-side attacker code is effectively contained by the browser sandbox.
+- The **Node** side (install/build) has full container network + filesystem
+  access — this is where F1/F2 live.
+
+Therefore shrinking Node-side execution directly shrinks F1/F2. Note that
+"overwrite `vite.config`" *alone* is insufficient: `pnpm install` root scripts
+run first (dominant RCE), and other Node-executed configs (`postcss.config`,
+`tailwind.config`, `babel.config`) also run at build. Both are addressed:
+`--ignore-scripts` closes the install-script vector, and the `build_config/`
+overlay replaces *all* the submission's build-config files with the grader's, so
+no attacker-authored config executes.
+
+**Residual (known):** the build still invokes the build binaries and plugins from
+the submission's own `node_modules` (`node_modules/.bin/vite`, `.../tsc`). With
+`--ignore-scripts` these can't run install hooks, but a submission could still
+alias e.g. `"vite"` to a malicious package so the invoked binary is attacker
+code. Fully closing this requires running the **trusted test repo's** toolchain
+(`vite`/`tsc` and the plugins its config imports) against the assessment source,
+rather than the submission's binaries. Recommended next step if the residual is
+unacceptable. Regardless, surface reduction is a hardening layer, not a proof of
+zero execution for arbitrary submissions, so the containment controls above
+remain necessary.
 
 ### The metadata limitation (important, and honest)
 
