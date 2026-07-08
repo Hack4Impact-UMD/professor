@@ -17,9 +17,24 @@ import (
 )
 
 type cloneResult struct {
-	GradingDir    string
+	// AssessmentDir and TestDir are deliberately created under separate temp
+	// roots (not siblings under a shared parent). Untrusted assessment code runs
+	// during `pnpm install`/`vite build`; keeping the trusted test tree out of a
+	// predictable sibling path removes the naive `../tests` traversal that would
+	// let that code overwrite spec files or playwright.config.ts to forge grades.
+	// The assessment is only ever exposed to the tests as static files over HTTP,
+	// never imported into the test process.
 	AssessmentDir string
 	TestDir       string
+}
+
+func (c cloneResult) cleanup() {
+	if c.AssessmentDir != "" {
+		os.RemoveAll(c.AssessmentDir)
+	}
+	if c.TestDir != "" {
+		os.RemoveAll(c.TestDir)
+	}
 }
 
 const MAX_REPO_SIZE_MB = 10
@@ -41,18 +56,23 @@ func cloneWithSizeCheck(path string, dest string, pat string) error {
 func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string, logger *slog.Logger) (cloneResult, error) {
 	pat := os.Getenv("GITHUB_PAT")
 
-	gradingDir, err := os.MkdirTemp("", "job-*")
-
+	// Separate temp roots so the untrusted assessment tree and the trusted test
+	// tree are not siblings under a common, predictable parent.
+	assessmentDir, err := os.MkdirTemp("", "job-assessment-*")
 	if err != nil {
 		return cloneResult{}, err
 	}
+	testDir, err := os.MkdirTemp("", "job-tests-*")
+	if err != nil {
+		os.RemoveAll(assessmentDir)
+		return cloneResult{}, err
+	}
+
+	result := cloneResult{AssessmentDir: assessmentDir, TestDir: testDir}
 
 	wg := errgroup.Group{}
 
-	assessmentDir := filepath.Join(gradingDir, "assessment")
-	testDir := filepath.Join(gradingDir, "tests")
-
-	logger.Info("cloning repos", "jobId", jobId, "assessmentRepo", assessmentRepoPath, "testRepo", testRepoPath, "dir", gradingDir)
+	logger.Info("cloning repos", "jobId", jobId, "assessmentRepo", assessmentRepoPath, "testRepo", testRepoPath, "assessmentDir", assessmentDir, "testDir", testDir)
 
 	wg.Go(func() error {
 		if err := cloneWithSizeCheck(assessmentRepoPath, assessmentDir, pat); err != nil {
@@ -70,17 +90,13 @@ func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string, lo
 	})
 
 	if err := wg.Wait(); err != nil {
-		os.RemoveAll(gradingDir)
+		result.cleanup()
 		return cloneResult{}, err
 	}
 
 	logger.Info("repos cloned", "jobId", jobId, "assessmentDir", assessmentDir, "testDir", testDir)
 
-	return cloneResult{
-		GradingDir:    gradingDir,
-		AssessmentDir: assessmentDir,
-		TestDir:       testDir,
-	}, nil
+	return result, nil
 }
 
 func RunGradingJobLocal(jobId string, assessmentRepoDir string, testRepoDir string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
@@ -98,7 +114,7 @@ func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string,
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(clone.GradingDir)
+	defer clone.cleanup()
 
 	return grade(jobId, clone.AssessmentDir, clone.TestDir, reporter, logger)
 }

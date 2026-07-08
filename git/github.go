@@ -28,6 +28,13 @@ func (c *GitHubClient) GetRepoSizeKB(path string) (int, error) {
 	}
 	defer resp.Body.Close()
 
+	// Fail closed: a non-200 (e.g. 404 for a missing/private repo, or 403 when
+	// rate-limited) returns a body without a "size" field, which would decode to
+	// 0 and silently pass the size gate. Reject anything that isn't a clean 200.
+	if resp.StatusCode != http.StatusOK {
+		return -1, fmt.Errorf("github api returned status %d for repo %q", resp.StatusCode, path)
+	}
+
 	repoData := githubRepoResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&repoData); err != nil {
 		return -1, err

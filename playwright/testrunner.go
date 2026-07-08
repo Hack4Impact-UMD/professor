@@ -30,9 +30,15 @@ type ndjsonEvent struct {
 }
 
 func extractTestRepo(testDir string) (TestRepo, error) {
-	cmd := exec.Command("npm", "run", "extract-tests", "--silent")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "npm", "run", "extract-tests", "--silent")
 	cmd.Dir = testDir
 	out, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return TestRepo{}, fmt.Errorf("extract-tests timed out")
+	}
 	if err != nil {
 		return TestRepo{}, fmt.Errorf("extract-tests: %w", err)
 	}
