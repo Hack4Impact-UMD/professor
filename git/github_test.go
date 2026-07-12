@@ -51,6 +51,33 @@ func TestGetRepoSizeKB_InvalidJSON(t *testing.T) {
 	}
 }
 
+// A non-200 response (404 for a missing/private repo, 403 when rate-limited)
+// must fail closed: previously the error body decoded to size 0 and silently
+// passed the size gate.
+func TestGetRepoSizeKB_Non200(t *testing.T) {
+	for _, status := range []int{http.StatusNotFound, http.StatusForbidden} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(status)
+				// GitHub returns a body without a "size" field on errors.
+				w.Write([]byte(`{"message":"Not Found"}`))
+			}))
+			defer srv.Close()
+
+			client := NewGitHubClient(srv.URL, srv.Client())
+			size, err := client.GetRepoSizeKB("some-org/some-repo")
+
+			if err == nil {
+				t.Fatalf("expected an error for status %d, got nil (size %d)", status, size)
+			}
+			if size != -1 {
+				t.Errorf("expected size -1 on error, got %d", size)
+			}
+		})
+	}
+}
+
 func TestGetRepoSizeKB_NetworkError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	srv.Close() // close immediately so the request fails
