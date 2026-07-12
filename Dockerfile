@@ -60,10 +60,11 @@ COPY --from=builder /app/professor ./professor
 # non-root uid limits the blast radius of a container escape and prevents the
 # untrusted step from overwriting the professor binary or other container files.
 # Playwright/pnpm write only to the per-job temp dirs and $HOME, so give the user
-# a real home directory it owns. The browsers in /ms-playwright are world-readable
-# (chmod above), so the non-root user can execute them.
-RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin professor \
-    && chown -R professor:professor /app
+# a real home directory it owns; /app (including the professor binary) stays
+# root-owned and read-only to the non-root user. The browsers in /ms-playwright
+# are world-readable (chmod above), so the non-root user can execute them.
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin professor
+ENV HOME=/home/professor
 USER professor
 
 CMD ["./professor", "serve"]

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 )
 
 type githubRepoResponse struct {
@@ -22,7 +23,17 @@ func NewGitHubClient(baseURL string, httpClient *http.Client) *GitHubClient {
 }
 
 func (c *GitHubClient) GetRepoSizeKB(path string) (int, error) {
-	resp, err := c.httpClient.Get(fmt.Sprintf("%s/repos/%s", c.baseURL, path))
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/repos/%s", c.baseURL, path), nil)
+
+	if err != nil {
+		return -1, err
+	}
+
+	if pat := os.Getenv("GITHUB_PAT"); pat != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", pat))
+	}
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return -1, err
 	}
