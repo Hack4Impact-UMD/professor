@@ -79,7 +79,7 @@ func applyTrustedBuildConfig(assessmentDir string, testDir string) (string, erro
 
 	info, err := os.Stat(buildConfigDir)
 	if err != nil || !info.IsDir() {
-		return "", fmt.Errorf("test repo has no %s/; building with the submission's own build config\n", buildConfigDirName)
+		return "", fmt.Errorf("test repo has no %s/; aborting build\n", buildConfigDirName)
 	}
 
 	if err := overlayDir(buildConfigDir, assessmentDir); err != nil {
