@@ -44,7 +44,21 @@ func InstallDeps(repoDir string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), installTimeout)
 	defer cancel()
 
-	return runBuildCommand(ctx, repoDir, util.SandboxedCommandEnv(), "pnpm", "install", "--ignore-scripts")
+	out, err := runBuildCommand(ctx, repoDir, util.SandboxedCommandEnv(), "pnpm", "install", "--ignore-scripts")
+	if err != nil {
+		return out, err
+	}
+
+	tailwindOut, err := ensureTailwind(ctx, repoDir)
+	return out + tailwindOut, err
+}
+
+// ensureTailwind guarantees tailwindcss and @tailwindcss/vite are present in
+// repoDir's node_modules before the build step runs, since the trusted build
+// config's vite.config wires in the @tailwindcss/vite plugin regardless of
+// whether the submission itself declared these as dependencies.
+func ensureTailwind(ctx context.Context, repoDir string) (string, error) {
+	return runBuildCommand(ctx, repoDir, util.SandboxedCommandEnv(), "pnpm", "add", "-D", "--ignore-scripts", "tailwindcss", "@tailwindcss/vite")
 }
 
 func BuildAssessment(assessmentDir string, testDir string) (string, error) {
