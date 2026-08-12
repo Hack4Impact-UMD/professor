@@ -41,11 +41,30 @@ RUN npm install -g pnpm@11 \
 # chromium project without an explicit `channel` resolves to the headless shell
 # (Playwright v1.49+). NOTE: grader-controlled test configs must NOT set
 # `channel: 'chromium'`, since the full headed browser is intentionally not installed.
+#
+# Install the browsers into a shared, root-owned path (not root's HOME cache) so
+# the non-root runtime user can locate them. PLAYWRIGHT_BROWSERS_PATH is forwarded
+# to the test subprocess by util.SandboxedEnv (PLAYWRIGHT_ prefix allowlist).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN npx playwright install --with-deps --only-shell chromium \
+    && chmod -R a+rX /ms-playwright \
     && npm cache clean --force
 
 WORKDIR /app
 
 # copy image to production and run binary
 COPY --from=builder /app/professor ./professor
+
+# Run as an unprivileged user. Untrusted assessment code (pnpm lifecycle scripts,
+# vite build) executes inside this container, so it must not run as root: a
+# non-root uid limits the blast radius of a container escape and prevents the
+# untrusted step from overwriting the professor binary or other container files.
+# Playwright/pnpm write only to the per-job temp dirs and $HOME, so give the user
+# a real home directory it owns; /app (including the professor binary) stays
+# root-owned and read-only to the non-root user. The browsers in /ms-playwright
+# are world-readable (chmod above), so the non-root user can execute them.
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin professor
+ENV HOME=/home/professor
+USER professor
+
 CMD ["./professor", "serve"]

@@ -20,21 +20,32 @@ type GradeRequest struct {
 func GradeHandler(w http.ResponseWriter, r *http.Request, fsClient *firestore.Client) {
 	var gradeReq GradeRequest
 	if err := json.NewDecoder(r.Body).Decode(&gradeReq); err != nil {
+		slog.Default().Warn("bad request: failed to decode body", "err", err)
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 	if gradeReq.JobId == "" || gradeReq.RepoURL == "" || gradeReq.TestRepo == "" {
+		slog.Default().Warn("bad request: missing required fields", "jobId", gradeReq.JobId, "repoURL", gradeReq.RepoURL, "testRepo", gradeReq.TestRepo)
 		http.Error(w, "jobId, repoURL, and testRepo are required", http.StatusBadRequest)
 		return
 	}
 
+	slog.Default().Info("grade request received", "jobId", gradeReq.JobId, "repoURL", gradeReq.RepoURL, "testRepo", gradeReq.TestRepo)
+
 	rep, err := reporter.NewFirestoreReporter(fsClient)
 	if err != nil {
+		slog.Default().Error("reporter creation failed", "jobId", gradeReq.JobId, "err", err)
 		http.Error(w, fmt.Sprintf("reporter create error: %v", err.Error()), http.StatusInternalServerError)
 		return
 	}
 	if err := RunGradingJob(gradeReq.JobId, gradeReq.RepoURL, gradeReq.TestRepo, rep, slog.Default()); err != nil {
-		http.Error(w, fmt.Sprintf("grading error: %v", err.Error()), http.StatusInternalServerError)
+		slog.Default().Error("grading job failed", "jobId", gradeReq.JobId, "err", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "failed",
+			"error":  err.Error(),
+		})
 		return
 	}
 

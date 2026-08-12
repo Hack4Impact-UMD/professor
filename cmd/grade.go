@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 
 	"github.com/Hack4Impact-UMD/professor/reporter"
 	"github.com/Hack4Impact-UMD/professor/routes/grade"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
+
+var gradeLogFile string
 
 var gradeCmd = &cobra.Command{
 	Use:   "grade <assessment_repo_path> <test_repo_path>",
@@ -25,6 +28,7 @@ Example:
 }
 
 func init() {
+	gradeCmd.Flags().StringVar(&gradeLogFile, "log-file", "", "Write logs to this file instead of discarding them")
 	rootCmd.AddCommand(gradeCmd)
 }
 
@@ -37,9 +41,19 @@ func runGrade(cmd *cobra.Command, args []string) error {
 	rep := &reporter.CLIReporter{}
 	defer rep.Wait()
 
-	silent := slog.New(slog.NewTextHandler(io.Discard, nil))
+	var logger *slog.Logger
+	if gradeLogFile != "" {
+		f, err := os.OpenFile(gradeLogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("could not open log file: %w", err)
+		}
+		defer f.Close()
+		logger = slog.New(slog.NewTextHandler(f, nil))
+	} else {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 
-	if err := grade.RunGradingJobLocal(jobId, assessmentRepoPath, testRepoPath, rep, silent); err != nil {
+	if err := grade.RunGradingJobLocal(jobId, assessmentRepoPath, testRepoPath, rep, logger); err != nil {
 		return fmt.Errorf("grading failed: %w", err)
 	}
 

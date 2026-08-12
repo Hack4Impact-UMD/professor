@@ -1,19 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ⚠️ WARNING: EMULATOR ONLY!! 
+    // NOTE: These rules exist for the LOCAL FIRESTORE EMULATOR ONLY and are the
+    // deny-by-default baseline. Production rules live in the Application Portal
+    // repository and must NOT be replaced by this file. Professor itself writes
+    // via the Firebase Admin SDK, which bypasses these rules entirely, so these
+    // rules only govern direct client (frontend) access.
 
+    // Grading results are written exclusively by the Professor worker (Admin SDK).
+    // Direct client writes must never be allowed; reads should be scoped to the
+    // owning applicant in production (the app portal enforces that with auth).
     match /grading-jobs-public/{jobId} {
-      allow read, update: if true;
-      allow create, delete: if false; 
+      allow read: if true; // emulator only; production scopes this to the owner
+      allow write: if false;
     }
 
+    // Internal grading data (build/install/test logs, private test results) must
+    // never be exposed to clients.
     match /grading-jobs-internal/{jobId} {
-      allow read, update: if true;   
-      allow create, delete: if false; 
+      allow read, write: if false;
+    }
 
+    // Deny everything else.
     match /{document=**} {
-      allow read, write: if false; 
+      allow read, write: if false;
     }
   }
 }

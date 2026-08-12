@@ -6,7 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"time"
@@ -30,18 +30,25 @@ type ndjsonEvent struct {
 }
 
 func extractTestRepo(testDir string) (TestRepo, error) {
-	cmd := exec.Command("npm", "run", "extract-tests", "--silent")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "npm", "run", "extract-tests", "--silent")
 	cmd.Dir = testDir
 	out, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return TestRepo{}, fmt.Errorf("extract-tests timed out")
+	}
 	if err != nil {
 		return TestRepo{}, fmt.Errorf("extract-tests: %w", err)
 	}
 	return ParseTestRepo(out)
 }
 
-func RunPlaywrightTests(jobId string, testDir string, port int, reporter GradingJobReporter) error {
+func RunPlaywrightTests(jobId string, testDir string, port int, reporter GradingJobReporter, logger *slog.Logger) error {
 	repo, err := extractTestRepo(testDir)
 	if err != nil {
+		logger.Error("failed to extract test repo", "jobId", jobId, "err", err)
 		reporter.OnTestingStart(jobId, TestRepo{}, err)
 		return err
 	}
@@ -73,10 +80,12 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 	}
 
 	if err := cmd.Start(); err != nil {
+		logger.Error("failed to start playwright", "jobId", jobId, "err", err)
 		reporter.OnTestingStart(jobId, repo, err)
 		return err
 	}
 
+	logger.Info("running playwright tests", "jobId", jobId, "testDir", testDir, "port", port)
 	reporter.OnTestingStart(jobId, repo, nil)
 
 	scanner := bufio.NewScanner(stdout)
@@ -112,7 +121,7 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Printf("Scanner error when reading playwright output: %v", err)
+		logger.Error("scanner error reading playwright output", "jobId", jobId, "err", err)
 		reporter.OnTestingEnd(jobId, err)
 		return err
 	}
@@ -123,5 +132,6 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 		}
 	}
 
+	logger.Info("playwright tests complete", "jobId", jobId)
 	return nil
 }
