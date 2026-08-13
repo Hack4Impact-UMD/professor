@@ -291,6 +291,7 @@ resource "google_monitoring_alert_policy" "professor_queue_depth" {
   }
 
   documentation {
+    mime_type = null
     subject = "High Professor Queue Depth"
   }
 }
@@ -365,6 +366,7 @@ resource "google_monitoring_alert_policy" "professor_service_high_memory" {
   }
 
   documentation {
+    mime_type = null
     subject = "High memory utilization on professor-service"
   }
 }
@@ -405,6 +407,7 @@ resource "google_monitoring_alert_policy" "professor_service_high_cpu" {
   }
 
   documentation {
+    mime_type = null
     subject = "High CPU utilization on professor-service"
   }
 }
@@ -445,6 +448,7 @@ resource "google_monitoring_alert_policy" "professor_service_instance_count" {
   }
 
   documentation {
+    mime_type = null
     subject = "Cloud Run instance count above 5 on professor-service"
   }
 }
