@@ -82,3 +82,41 @@ resource "google_cloud_tasks_queue" "professor_grading_requests" {
     min_backoff   = "0.100s"
   }
 }
+
+resource "google_iam_workload_identity_pool" "github" {
+  deletion_policy           = "ABANDON"
+  display_name              = "GitHub Actions Pool"
+  project                   = "h4i-applications"
+  workload_identity_pool_id = "github"
+}
+
+resource "google_iam_workload_identity_pool_provider" "github" {
+  attribute_condition = "assertion.repository_owner == 'Hack4Impact-UMD'"
+  attribute_mapping = {
+    "attribute.actor"            = "assertion.actor"
+    "attribute.repository"       = "assertion.repository"
+    "attribute.repository_owner" = "assertion.repository_owner"
+    "google.subject"             = "assertion.sub"
+  }
+  deletion_policy                    = "ABANDON"
+  display_name                       = "My GitHub repo Provider"
+  project                            = "h4i-applications"
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
+  workload_identity_pool_provider_id = "my-repo"
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+
+resource "google_service_account_iam_member" "github_actions_wif_user" {
+  service_account_id = "projects/h4i-applications/serviceAccounts/github-actions@h4i-applications.iam.gserviceaccount.com"
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/projects/361966602736/locations/global/workloadIdentityPools/github/attribute.repository/Hack4Impact-UMD/professor"
+}
+
+resource "google_service_account_iam_member" "github_actions_token_creator" {
+  service_account_id = "projects/h4i-applications/serviceAccounts/github-actions@h4i-applications.iam.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "principalSet://iam.googleapis.com/projects/361966602736/locations/global/workloadIdentityPools/github/attribute.repository/Hack4Impact-UMD/professor"
+}
