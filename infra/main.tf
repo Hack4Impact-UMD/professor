@@ -138,3 +138,23 @@ resource "google_project_iam_member" "github_actions_service_account_user" {
   role    = "roles/iam.serviceAccountUser"
   member  = "serviceAccount:github-actions@h4i-applications.iam.gserviceaccount.com"
 }
+
+resource "google_project_iam_member" "professor_service_datastore_user" {
+  project = "h4i-applications"
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:professor-service@h4i-applications.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "professor_service_secret_accessor" {
+  project = "h4i-applications"
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:professor-service@h4i-applications.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_service_iam_member" "professor_queue_invoker" {
+  project  = "h4i-applications"
+  location = "us-east4"
+  service  = "professor-service"
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:queue-invoker@h4i-applications.iam.gserviceaccount.com"
+}
