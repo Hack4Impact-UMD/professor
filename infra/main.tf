@@ -120,3 +120,21 @@ resource "google_service_account_iam_member" "github_actions_token_creator" {
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = "principalSet://iam.googleapis.com/projects/361966602736/locations/global/workloadIdentityPools/github/attribute.repository/Hack4Impact-UMD/professor"
 }
+
+resource "google_project_iam_member" "github_actions_artifact_registry_writer" {
+  project = "h4i-applications"
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:github-actions@h4i-applications.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "github_actions_run_admin" {
+  project = "h4i-applications"
+  role    = "roles/run.admin"
+  member  = "serviceAccount:github-actions@h4i-applications.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "github_actions_service_account_user" {
+  project = "h4i-applications"
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:github-actions@h4i-applications.iam.gserviceaccount.com"
+}
