@@ -1,6 +1,6 @@
-locals { 
-    github_actions_service_account_email = "github-actions@${local.project_id}.iam.gserviceaccount.com"
-    github_actions_repo_principal = "principalSet://iam.googleapis.com/projects/${local.project_number}/locations/global/workloadIdentityPools/github/attribute.repository/${local.github_repository_owner}/${local.github_repository_name}"
+locals {
+  github_actions_service_account_email = "github-actions@${local.project_id}.iam.gserviceaccount.com"
+  github_actions_repo_principal        = "principalSet://iam.googleapis.com/projects/${local.project_number}/locations/global/workloadIdentityPools/github/attribute.repository/${local.github_repository_owner}/${local.github_repository_name}"
 }
 
 resource "google_iam_workload_identity_pool" "github" {

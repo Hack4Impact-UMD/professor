@@ -19,8 +19,8 @@ resource "google_project_iam_member" "professor_service_secret_accessor" {
 }
 
 resource "google_secret_manager_secret" "professor_github_pat" {
-  project             = local.project_id
-  secret_id           = "PROFESSOR_GITHUB_PAT"
+  project   = local.project_id
+  secret_id = "PROFESSOR_GITHUB_PAT"
   replication {
     auto {
     }
@@ -108,7 +108,7 @@ resource "google_cloud_run_v2_service" "professor" {
       client,
       client_version,
       template[0].containers[0].image,
-      template[0].labels,              
+      template[0].labels,
     ]
   }
 }
