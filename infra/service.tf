@@ -1,25 +1,25 @@
 resource "google_service_account" "professor_service" {
-  account_id      = "professor-service"
+  account_id      = local.professor_service_account_id
   deletion_policy = "ABANDON"
   description     = "Role for Professor autograder"
-  display_name    = "professor-service"
-  project         = "h4i-applications"
+  display_name    = local.professor_service_name
+  project         = local.project_id
 }
 
 resource "google_project_iam_member" "professor_service_datastore_user" { // firestore permission 
-  project = "h4i-applications"
+  project = local.project_id
   role    = "roles/datastore.user"
   member  = "serviceAccount:${google_service_account.professor_service.email}"
 }
 
 resource "google_project_iam_member" "professor_service_secret_accessor" {
-  project = "h4i-applications"
+  project = local.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.professor_service.email}"
 }
 
 resource "google_secret_manager_secret" "professor_github_pat" {
-  project             = "h4i-applications"
+  project             = local.project_id
   secret_id           = "PROFESSOR_GITHUB_PAT"
   replication {
     auto {
@@ -31,9 +31,9 @@ resource "google_cloud_run_v2_service" "professor" {
   deletion_policy     = "ABANDON"
   deletion_protection = true
   ingress             = "INGRESS_TRAFFIC_ALL"
-  location            = "us-east4"
-  name                = "professor-service"
-  project             = "h4i-applications"
+  location            = local.region
+  name                = local.professor_service_name
+  project             = local.project_id
 
   scaling {
     max_instance_count = 10
@@ -47,8 +47,8 @@ resource "google_cloud_run_v2_service" "professor" {
     containers {
       # Cloud Run requires an image in the service template, but GitHub Actions owns
       # image updates. The lifecycle block below prevents Terraform from changing this field.
-      image = "us-east4-docker.pkg.dev/h4i-applications/professor-repo/professor-service:57d92c0f3b9c477e735d895191f04622a6cf6524"
-      name  = "professor-service-1"
+      image = "${local.region}-docker.pkg.dev/${local.project_id}/${local.artifact_repository_id}/${local.professor_service_name}:57d92c0f3b9c477e735d895191f04622a6cf6524"
+      name  = "${local.professor_service_name}-1"
 
       env {
         name = "GITHUB_PAT"
@@ -63,7 +63,7 @@ resource "google_cloud_run_v2_service" "professor" {
 
       env {
         name  = "PROJECT_ID"
-        value = "h4i-applications"
+        value = local.project_id
       }
 
       ports {

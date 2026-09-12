@@ -1,15 +1,15 @@
 resource "google_service_account" "queue_invoker" {
-  account_id      = "queue-invoker"
+  account_id      = local.queue_invoker_account_id
   deletion_policy = "ABANDON"
   description     = "Service account used by Cloud Tasks to invoke Cloud Run services"
   display_name    = "Cloud Tasks Queue Invoker"
-  project         = "h4i-applications"
+  project         = local.project_id
 }
 
 resource "google_cloud_run_service_iam_member" "professor_queue_invoker" {
-  project  = "h4i-applications"
-  location = "us-east4"
-  service  = "professor-service"
+  project  = local.project_id
+  location = local.region
+  service  = local.professor_service_name
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.queue_invoker.email}"
 }
@@ -17,9 +17,9 @@ resource "google_cloud_run_service_iam_member" "professor_queue_invoker" {
 resource "google_cloud_tasks_queue" "professor_grading_requests" {
   deletion_policy = "ABANDON"
   desired_state   = "RUNNING"
-  location        = "us-east4"
-  name            = "professor-grading-requests"
-  project         = "h4i-applications"
+  location        = local.region
+  name            = local.grading_queue_name
+  project         = local.project_id
 
   rate_limits {
     max_concurrent_dispatches = 10
