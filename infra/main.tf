@@ -1,3 +1,20 @@
+locals {
+  project_id = "h4i-applications"
+  project_number = "361966602736"
+  region = "us-east4"
+
+  github_repository_owner = "Hack4Impact-UMD"
+  github_repository_name = "professor"
+  
+  professor_service_name = "professor-service"
+  professor_service_account_id = "professor-service"
+  
+  artifact_repository_id = "professor-repo"
+  
+  grading_queue_name = "professor-grading-requests"
+  queue_invoker_account_id = "queue-invoker"
+}
+
 terraform {
     backend "gcs" {
         bucket = "h4i-applications-terraform-state"
@@ -10,10 +27,10 @@ resource "google_artifact_registry_repository" "professor" {
   deletion_policy        = "ABANDON"
   description            = "Docker images for h4i-umd autograder"
   format                 = "DOCKER"
-  location               = "us-east4"
+  location               = local.region
   mode                   = "STANDARD_REPOSITORY"
-  project                = "h4i-applications"
-  repository_id          = "professor-repo"
+  project                = local.project_id
+  repository_id          = local.artifact_repository_id
 
   cleanup_policies {
     action = "DELETE"

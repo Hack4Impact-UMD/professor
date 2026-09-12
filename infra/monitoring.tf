@@ -1,8 +1,8 @@
 locals {
   professor_alert_notification_channels = [
-    "projects/h4i-applications/notificationChannels/8006514687676133218",
-    "projects/h4i-applications/notificationChannels/13261586194715419281",
-    "projects/h4i-applications/notificationChannels/12677533325804840933",
+    "projects/${local.project_id}/notificationChannels/8006514687676133218",
+    "projects/${local.project_id}/notificationChannels/13261586194715419281",
+    "projects/${local.project_id}/notificationChannels/12677533325804840933",
   ]
 }
 
@@ -12,7 +12,7 @@ resource "google_monitoring_alert_policy" "professor_queue_depth" {
   display_name          = "Professor Queue Depth"
   enabled               = true
   notification_channels = local.professor_alert_notification_channels
-  project               = "h4i-applications"
+  project               = local.project_id
   severity              = "WARNING"
 
   alert_strategy {
@@ -56,7 +56,7 @@ resource "google_monitoring_alert_policy" "professor_queue_high_request_rate" {
   display_name          = "Professor Queue - High request rate"
   enabled               = true
   notification_channels = local.professor_alert_notification_channels
-  project               = "h4i-applications"
+  project               = local.project_id
   severity              = "WARNING"
 
   alert_strategy {
@@ -90,7 +90,7 @@ resource "google_monitoring_alert_policy" "professor_service_high_memory" {
   display_name          = "Professor Service - High memory utilization"
   enabled               = true
   notification_channels = local.professor_alert_notification_channels
-  project               = "h4i-applications"
+  project               = local.project_id
   severity              = "WARNING"
 
   alert_strategy {
@@ -103,7 +103,7 @@ resource "google_monitoring_alert_policy" "professor_service_high_memory" {
     condition_threshold {
       comparison      = "COMPARISON_GT"
       duration        = "300s"
-      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"professor-service\" AND metric.type = \"run.googleapis.com/container/memory/utilizations\""
+      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"${local.professor_service_name}\" AND metric.type = \"run.googleapis.com/container/memory/utilizations\""
       threshold_value = 0.8
 
       aggregations {
@@ -122,7 +122,7 @@ resource "google_monitoring_alert_policy" "professor_service_high_memory" {
   documentation {
     content   = "The Professor Cloud Run service has memory utilization above 80% for 5 minutes."
     mime_type = "text/markdown"
-    subject   = "High memory utilization on professor-service"
+    subject   = "High memory utilization on ${local.professor_service_name}"
   }
 }
 
@@ -132,7 +132,7 @@ resource "google_monitoring_alert_policy" "professor_service_high_cpu" {
   display_name          = "Professor Service - High CPU utilization"
   enabled               = true
   notification_channels = local.professor_alert_notification_channels
-  project               = "h4i-applications"
+  project               = local.project_id
   severity              = "WARNING"
 
   alert_strategy {
@@ -145,7 +145,7 @@ resource "google_monitoring_alert_policy" "professor_service_high_cpu" {
     condition_threshold {
       comparison      = "COMPARISON_GT"
       duration        = "300s"
-      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"professor-service\" AND metric.type = \"run.googleapis.com/container/cpu/utilizations\""
+      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"${local.professor_service_name}\" AND metric.type = \"run.googleapis.com/container/cpu/utilizations\""
       threshold_value = 0.8
 
       aggregations {
@@ -164,7 +164,7 @@ resource "google_monitoring_alert_policy" "professor_service_high_cpu" {
   documentation {
     content   = "The Professor Cloud Run service has CPU utilization above 80% for 5 minutes."
     mime_type = "text/markdown"
-    subject   = "High CPU utilization on professor-service"
+    subject   = "High CPU utilization on ${local.professor_service_name}"
   }
 }
 
@@ -174,7 +174,7 @@ resource "google_monitoring_alert_policy" "professor_service_instance_count" {
   display_name          = "Professor Service - Instance count above 5"
   enabled               = true
   notification_channels = local.professor_alert_notification_channels
-  project               = "h4i-applications"
+  project               = local.project_id
   severity              = "WARNING"
 
   alert_strategy {
@@ -187,7 +187,7 @@ resource "google_monitoring_alert_policy" "professor_service_instance_count" {
     condition_threshold {
       comparison      = "COMPARISON_GT"
       duration        = "300s"
-      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"professor-service\" AND metric.type = \"run.googleapis.com/container/instance_count\""
+      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"${local.professor_service_name}\" AND metric.type = \"run.googleapis.com/container/instance_count\""
       threshold_value = 5
 
       aggregations {
@@ -206,6 +206,6 @@ resource "google_monitoring_alert_policy" "professor_service_instance_count" {
   documentation {
     content   = "The Professor Cloud Run service has more than 5 active instances for 5 minutes."
     mime_type = "text/markdown"
-    subject   = "Cloud Run instance count above 5 on professor-service"
+    subject   = "Cloud Run instance count above 5 on ${local.professor_service_name}"
   }
 }
