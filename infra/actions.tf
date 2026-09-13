@@ -57,12 +57,12 @@ resource "google_cloud_run_v2_service_iam_member" "github_actions_run_admin" {
   project  = local.project_id
   location = local.region
   name     = google_cloud_run_v2_service.professor.name
-  role    = "roles/run.admin"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
+  role     = "roles/run.admin"
+  member   = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
 resource "google_service_account_iam_member" "github_actions_service_account_user" {
   service_account_id = google_service_account.professor_service.name
-  role    = "roles/iam.serviceAccountUser"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions.email}"
 }
