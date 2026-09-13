@@ -25,7 +25,7 @@ resource "google_monitoring_alert_policy" "professor_queue_depth" {
     condition_threshold {
       comparison      = "COMPARISON_GT"
       duration        = "0s"
-      filter          = "resource.type = \"cloud_tasks_queue\" AND metric.type = \"cloudtasks.googleapis.com/queue/depth\""
+      filter          = "resource.type = \"cloud_tasks_queue\" AND resource.labels.queue_id = \"${local.grading_queue_name}\" AND metric.type = \"cloudtasks.googleapis.com/queue/depth\""
       threshold_value = 15
 
       aggregations {
@@ -69,7 +69,7 @@ resource "google_monitoring_alert_policy" "professor_queue_high_request_rate" {
     condition_threshold {
       comparison      = "COMPARISON_GT"
       duration        = "0s"
-      filter          = "resource.type = \"cloud_tasks_queue\" AND metric.type = \"cloudtasks.googleapis.com/api/request_count\""
+      filter          = "resource.type = \"cloud_tasks_queue\" AND resource.labels.queue_id = \"${local.grading_queue_name}\" AND metric.type = \"cloudtasks.googleapis.com/api/request_count\""
       threshold_value = 5
 
       aggregations {
