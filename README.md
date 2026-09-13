@@ -49,7 +49,7 @@ graph TB
 - **Package Manager**: pnpm
 - **Testing**: Playwright
 - **Database**: Firestore
-- **Deployment**: Docker, Google Cloud Run
+- **Deployment**: Docker, Google Cloud, Terraform
 
 ## Local Development
 
