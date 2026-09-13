@@ -22,10 +22,10 @@ resource "google_secret_manager_secret" "professor_github_pat" {
 }
 
 resource "google_secret_manager_secret_iam_member" "professor_service_github_pat_accessor" {
-  project = local.project_id
+  project   = local.project_id
   secret_id = google_secret_manager_secret.professor_github_pat.secret_id
-  role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${google_service_account.professor_service.email}"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.professor_service.email}"
 }
 
 resource "google_cloud_run_v2_service" "professor" {
