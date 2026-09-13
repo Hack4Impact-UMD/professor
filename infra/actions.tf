@@ -47,14 +47,16 @@ resource "google_project_iam_member" "github_actions_artifact_registry_writer" {
   member  = "serviceAccount:${local.github_actions_service_account_email}"
 }
 
-resource "google_project_iam_member" "github_actions_run_admin" {
-  project = local.project_id
+resource "google_cloud_run_v2_service_iam_member" "github_actions_run_admin" {
+  project  = local.project_id
+  location = local.region
+  name     = google_cloud_run_v2_service.professor.name
   role    = "roles/run.admin"
   member  = "serviceAccount:${local.github_actions_service_account_email}"
 }
 
-resource "google_project_iam_member" "github_actions_service_account_user" {
-  project = local.project_id
+resource "google_service_account_iam_member" "github_actions_service_account_user" {
+  service_account_id = google_service_account.professor_service.name
   role    = "roles/iam.serviceAccountUser"
   member  = "serviceAccount:${local.github_actions_service_account_email}"
 }
