@@ -7,11 +7,7 @@ on:
     paths:
       - "infra/**"
       - ".github/workflows/terraform.yml"
-  pull_request:
-    paths:
-      - "infra/**"
-      - ".github/workflows/terraform.yml"
-  workflow_dispatch:
+  workflow_dispatch: # TODO remove this
 
 jobs:
   terraform:
