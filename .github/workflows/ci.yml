@@ -35,7 +35,6 @@ jobs:
         run: go mod download
 
   go-fmt:
-    needs: go-deps
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,15 +46,9 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Restore Go modules and build cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.gocache
-          key: gocache-${{ runner.os }}-${{ hashFiles('go.sum') }}
-
       - name: Check gofmt
         run: |
-          unformatted=$(gofmt -l $(go list -f '{{.Dir}}' ./...))
+          unformatted=$(git ls-files '*.go' | xargs gofmt -l)
           if [ -n "$unformatted" ]; then
             echo "The following files are not gofmt'd:"
             echo "$unformatted"
