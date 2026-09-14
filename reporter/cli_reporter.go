@@ -21,11 +21,9 @@ type CLIReporter struct {
 func (r *CLIReporter) start(jobId string) {
 	r.once.Do(func() {
 		r.program = tea.NewProgram(newGradingModel(jobId))
-		r.wg.Add(1)
-		go func() {
-			defer r.wg.Done()
+		r.wg.Go(func() {
 			r.program.Run() //nolint:errcheck
-		}()
+		})
 	})
 }
 

@@ -346,7 +346,7 @@ func renderLines(sb *strings.Builder, output string) {
 	if output == "" {
 		return
 	}
-	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(output, "\n"), "\n") {
 		sb.WriteString(styleDim.Render("  │ "+line) + "\n")
 	}
 }
