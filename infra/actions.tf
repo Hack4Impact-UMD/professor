@@ -5,7 +5,7 @@ locals {
 resource "google_service_account" "github_actions" {
   account_id      = "github-actions"
   deletion_policy = "ABANDON"
-  display_name    = "GitHub Actions"
+  display_name    = "GitHub Actions account"
   project         = local.project_id
 }
 
