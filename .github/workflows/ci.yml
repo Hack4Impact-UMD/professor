@@ -95,6 +95,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 11
 
       - name: Install playwright reporter deps
         working-directory: playwright/reporter
