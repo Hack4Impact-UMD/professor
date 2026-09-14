@@ -55,7 +55,7 @@ jobs:
 
       - name: Check gofmt
         run: |
-          unformatted=$(gofmt -l .)
+          unformatted=$(gofmt -l $(go list -f '{{.Dir}}' ./...))
           if [ -n "$unformatted" ]; then
             echo "The following files are not gofmt'd:"
             echo "$unformatted"
