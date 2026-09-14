@@ -59,11 +59,11 @@ type GradingJobPublic struct {
 
 // other fields can be fetched from GradingJobPublic
 type GradingJobDataInternal struct {
-	Id            string                  `firestore:"id"` // associated with a grading job id
-	TestRepo      string                  `firestore:"testRepo"`
-	BuildLog      string                  `firestore:"buildLog"`
-	InstallLog    string                  `firestore:"installLog"`
-	PlaywrightLog string                  `firestore:"playwrightLog"`
-	Error         string                  `firestore:"error,omitempty"`
+	Id            string                           `firestore:"id"` // associated with a grading job id
+	TestRepo      string                           `firestore:"testRepo"`
+	BuildLog      string                           `firestore:"buildLog"`
+	InstallLog    string                           `firestore:"installLog"`
+	PlaywrightLog string                           `firestore:"playwrightLog"`
+	Error         string                           `firestore:"error,omitempty"`
 	Tests         map[string]map[string]TestResult `firestore:"tests"` // suite name -> test name -> result
 }

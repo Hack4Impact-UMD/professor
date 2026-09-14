@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -71,12 +72,7 @@ func (r *mockReporter) OnTestEnd(jobId, suite, testName string, passed bool, std
 func (r *mockReporter) hasCall(call string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, c := range r.calls {
-		if c == call {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(r.calls, call)
 }
 
 func TestRunPlaywrightTests(t *testing.T) {

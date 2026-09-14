@@ -6,7 +6,7 @@ import (
 )
 
 // Send a JSON response
-func JSON(w http.ResponseWriter, body interface{}) {
+func JSON(w http.ResponseWriter, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
