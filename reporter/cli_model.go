@@ -31,7 +31,8 @@ type (
 		repo playwright.TestRepo
 		err  error
 	}
-	msgTestEnd struct {
+	msgTestStart struct{ suite, name string }
+	msgTestEnd   struct {
 		suite, name    string
 		passed         bool
 		stdout, stderr string
@@ -55,6 +56,7 @@ type testStatus int
 
 const (
 	testPending testStatus = iota
+	testRunning
 	testPassed
 	testFailed
 )
@@ -193,6 +195,14 @@ func (m gradingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.suites = append(m.suites, suite)
 		}
 
+	case msgTestStart:
+		key := msg.suite + "\x00" + msg.name
+		entry, ok := m.testIndex[key]
+		if !ok {
+			return m, nil
+		}
+		entry.status = testRunning
+
 	case msgTestEnd:
 		key := msg.suite + "\x00" + msg.name
 		entry, ok := m.testIndex[key]
@@ -290,6 +300,8 @@ func (m gradingModel) View() string {
 			switch t.status {
 			case testPending:
 				sb.WriteString("  " + styleDim.Render("○ "+t.displayName) + "\n")
+			case testRunning:
+				sb.WriteString("  " + styleDim.Render(sp+" "+t.displayName) + "\n")
 			case testPassed:
 				sb.WriteString("  " + styleOK.Render("✓") + " " + t.displayName +
 					styleDim.Render(fmt.Sprintf(" (%dms)", t.durationMs)) + "\n")
