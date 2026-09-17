@@ -93,7 +93,9 @@ func (r *CLIReporter) OnTestingStart(_ string, repo playwright.TestRepo, err err
 		r.wg.Wait()
 	}
 }
-func (r *CLIReporter) OnTestStart(_, _, _ string) {}
+func (r *CLIReporter) OnTestStart(_, suite, testName string) {
+	r.send(msgTestStart{suite, testName})
+}
 func (r *CLIReporter) OnTestEnd(_ string, suite, testName string, passed bool, stdout, stderr string, testErrors []string, durationMs int64, _ error) {
 	r.send(msgTestEnd{
 		suite:      suite,
