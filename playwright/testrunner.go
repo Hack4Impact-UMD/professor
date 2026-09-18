@@ -99,8 +99,20 @@ func RunPlaywrightTests(jobId string, testDir string, port int, reporter Grading
 
 		switch event.Type {
 		case "testBegin":
+			logger.Debug("playwright test started",
+				"jobId", jobId,
+				"suite", event.Suite,
+				"test", event.Test,
+			)
 			reporter.OnTestStart(jobId, event.Suite, event.Test)
 		case "testEnd":
+			logger.Debug("playwright test finished",
+				"jobId", jobId,
+				"suite", event.Suite,
+				"test", event.Test,
+				"passed", event.Passed,
+				"durationMs", event.DurationMs,
+			)
 			reporter.OnTestEnd(
 				jobId,
 				event.Suite,
