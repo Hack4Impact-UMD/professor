@@ -33,7 +33,7 @@ RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # install pnpm as the JS package manager (runs on the copied Node, no large binary)
-RUN npm install -g pnpm@11 \
+RUN npm install -g pnpm@12 \
     && npm cache clean --force
 
 # pre-install Playwright chromium-headless-shell (headless-only, smaller than full
