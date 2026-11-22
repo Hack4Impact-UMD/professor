@@ -46,7 +46,7 @@ RUN npm install -g pnpm@11 \
 # the non-root runtime user can locate them. PLAYWRIGHT_BROWSERS_PATH is forwarded
 # to the test subprocess by util.SandboxedEnv (PLAYWRIGHT_ prefix allowlist).
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN npx playwright install --with-deps --only-shell chromium \
+RUN npx playwright@1.61.1 install --with-deps --only-shell chromium \
     && chmod -R a+rX /ms-playwright \
     && npm cache clean --force
 
