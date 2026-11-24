@@ -13,6 +13,7 @@ import (
 )
 
 var gradeLogFile string
+var logLevelString string
 
 var gradeCmd = &cobra.Command{
 	Use:   "grade <assessment_repo_path> <test_repo_path>",
@@ -29,6 +30,7 @@ Example:
 
 func init() {
 	gradeCmd.Flags().StringVar(&gradeLogFile, "log-file", "", "Write logs to this file instead of discarding them")
+	gradeCmd.Flags().StringVar(&logLevelString, "log-level", "INFO", "Minimum log level. Options: DEBUG, INFO, WARN, ERROR")
 	rootCmd.AddCommand(gradeCmd)
 }
 
@@ -41,16 +43,23 @@ func runGrade(cmd *cobra.Command, args []string) error {
 	rep := &reporter.CLIReporter{}
 	defer rep.Wait()
 
+	var logLevel, err = parseLevel(logLevelString)
+	if err != nil {
+		return fmt.Errorf("Invalid log level %q: %w", logLevelString, err)
+	}
+
 	var logger *slog.Logger
+	logOptions := slog.HandlerOptions{Level: logLevel}
+
 	if gradeLogFile != "" {
 		f, err := os.OpenFile(gradeLogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			return fmt.Errorf("could not open log file: %w", err)
 		}
 		defer f.Close()
-		logger = slog.New(slog.NewTextHandler(f, nil))
+		logger = slog.New(slog.NewTextHandler(f, &logOptions))
 	} else {
-		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		logger = slog.New(slog.NewTextHandler(io.Discard, &logOptions))
 	}
 
 	if err := grade.RunGradingJobLocal(jobId, assessmentRepoPath, testRepoPath, rep, logger); err != nil {
@@ -58,4 +67,10 @@ func runGrade(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func parseLevel(s string) (slog.Level, error) {
+	var level slog.Level
+	var err = level.UnmarshalText([]byte(s))
+	return level, err
 }
