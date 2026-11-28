@@ -1,10 +1,12 @@
 package grade
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/Hack4Impact-UMD/professor/reporter"
@@ -38,7 +40,9 @@ func GradeHandler(w http.ResponseWriter, r *http.Request, fsClient *firestore.Cl
 		http.Error(w, fmt.Sprintf("reporter create error: %v", err.Error()), http.StatusInternalServerError)
 		return
 	}
-	if err := RunGradingJob(gradeReq.JobId, gradeReq.RepoURL, gradeReq.TestRepo, rep, slog.Default()); err != nil {
+
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Minute)
+	if err := RunGradingJob(ctx, gradeReq.JobId, gradeReq.RepoURL, gradeReq.TestRepo, rep, slog.Default()); err != nil {
 		slog.Default().Error("grading job failed", "jobId", gradeReq.JobId, "err", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

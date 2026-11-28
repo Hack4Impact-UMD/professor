@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/Hack4Impact-UMD/professor/sandbox"
 	"github.com/Hack4Impact-UMD/professor/util"
 )
 
@@ -45,7 +46,7 @@ func extractTestRepo(testDir string) (TestRepo, error) {
 	return ParseTestRepo(out)
 }
 
-func RunPlaywrightTests(jobId string, testDir string, port int, reporter GradingJobReporter, logger *slog.Logger) error {
+func RunPlaywrightTests(ctx context.Context, sb sandbox.Sandbox, jobId string, testDir string, port int, reporter GradingJobReporter, logger *slog.Logger) error {
 	repo, err := extractTestRepo(testDir)
 	if err != nil {
 		logger.Error("failed to extract test repo", "jobId", jobId, "err", err)

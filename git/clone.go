@@ -1,9 +1,11 @@
 package git
 
 import (
+	"context"
 	"errors"
 	"net/url"
-	"os/exec"
+
+	"github.com/Hack4Impact-UMD/professor/sandbox"
 )
 
 func githubRepoUrl(repoPath string, pat string) string {
@@ -14,7 +16,7 @@ func githubRepoUrl(repoPath string, pat string) string {
 	}
 }
 
-func CloneRepo(repoPath string, dest string, pat string) error {
+func CloneRepo(ctx context.Context, sb sandbox.Sandbox, repoPath string, dest string, pat string) error {
 	repo := githubRepoUrl(repoPath, pat)
 
 	url, err := url.Parse(repo)
@@ -27,9 +29,12 @@ func CloneRepo(repoPath string, dest string, pat string) error {
 		return errors.New("repo URL host name must be github.com")
 	}
 
-	cmd := exec.Command("git", "clone", "--depth", "1", repo, dest)
-
-	if _, err := cmd.CombinedOutput(); err != nil {
+	if _, err :=
+		sb.Exec(ctx, &sandbox.SandboxCommand{
+			Args: []string{
+				"git", "clone", "--depth", "1", repo, dest,
+			},
+		}); err != nil {
 		return err
 	}
 

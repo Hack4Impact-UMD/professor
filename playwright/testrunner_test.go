@@ -85,7 +85,7 @@ func TestRunPlaywrightTests(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(distDir, "index.html"), []byte(testIndexHTML), 0644); err != nil {
 		t.Fatalf("failed to write index.html: %v", err)
 	}
-	port, stop, err := serve.ServeAssessment(distDir)
+	port, stop, err := serve.ServeAssessment(ctx, sb, distDir)
 	if err != nil {
 		t.Fatalf("failed to start server: %v", err)
 	}

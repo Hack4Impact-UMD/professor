@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/Hack4Impact-UMD/professor/sandbox"
 	"github.com/Hack4Impact-UMD/professor/util"
 )
 
@@ -19,12 +20,24 @@ const (
 	buildTimeout   = 5 * time.Minute
 )
 
-func runBuildCommand(ctx context.Context, dir string, env []string, name string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir = dir
-	cmd.Env = env
+func envmap(e []string) map[string]string {
+	m := make(map[string]string)
+	for _, v := range e {
+		pts := strings.Split(v, "=")
+		m[pts[0]] = pts[1]
+	}
+	return m
+}
 
-	out, err := cmd.CombinedOutput()
+func runBuildCommand(ctx context.Context, sb sandbox.Sandbox, dir string, env []string, name string, args ...string) (string, error) {
+	ar := make([]string, 0)
+	ar = append(ar, name)
+	ar = append(ar, args...)
+	out, err := sb.Exec(ctx, &sandbox.SandboxCommand{
+		Args: ar,
+		Dir:  dir,
+		Env:  envmap(env),
+	})
 
 	if ctx.Err() == context.DeadlineExceeded {
 		return string(out), fmt.Errorf("%s timed out after %s", name, deadlineFor(ctx))
@@ -40,28 +53,24 @@ func deadlineFor(ctx context.Context) time.Duration {
 	return 0
 }
 
-func InstallDeps(repoDir string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), installTimeout)
+func InstallDeps(ctx context.Context, sb sandbox.Sandbox, repoDir string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, installTimeout)
 	defer cancel()
 
-	out, err := runBuildCommand(ctx, repoDir, util.SandboxedCommandEnv(), "pnpm", "install", "--ignore-scripts")
+	out, err := runBuildCommand(ctx, sb, repoDir, util.SandboxedCommandEnv(), "pnpm", "install", "--ignore-scripts")
 	if err != nil {
 		return out, err
 	}
 
-	tailwindOut, err := ensureTailwind(ctx, repoDir)
+	tailwindOut, err := ensureTailwind(ctx, sb, repoDir)
 	return out + tailwindOut, err
 }
 
-// ensureTailwind guarantees tailwindcss and @tailwindcss/vite are present in
-// repoDir's node_modules before the build step runs, since the trusted build
-// config's vite.config wires in the @tailwindcss/vite plugin regardless of
-// whether the submission itself declared these as dependencies.
-func ensureTailwind(ctx context.Context, repoDir string) (string, error) {
-	return runBuildCommand(ctx, repoDir, util.SandboxedCommandEnv(), "pnpm", "add", "-D", "--ignore-scripts", "tailwindcss", "@tailwindcss/vite")
+func ensureTailwind(ctx context.Context, sb sandbox.Sandbox, repoDir string) (string, error) {
+	return runBuildCommand(ctx, sb, repoDir, util.SandboxedCommandEnv(), "pnpm", "add", "-D", "--ignore-scripts", "tailwindcss", "@tailwindcss/vite")
 }
 
-func BuildAssessment(assessmentDir string, testDir string) (string, error) {
+func BuildAssessment(ctx context.Context, sb sandbox.Sandbox, assessmentDir string, testDir string) (string, error) {
 	configNote, err := applyTrustedBuildConfig(assessmentDir, testDir)
 	if err != nil {
 		return configNote, err
@@ -72,12 +81,12 @@ func BuildAssessment(assessmentDir string, testDir string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), buildTimeout)
 	defer cancel()
 
-	tscOut, err := runBuildCommand(ctx, assessmentDir, util.SandboxedEnv(), filepath.Join(binDir, "tsc"), "-b")
+	tscOut, err := runBuildCommand(ctx, sb, assessmentDir, util.SandboxedEnv(), filepath.Join(binDir, "tsc"), "-b")
 	if err != nil {
 		return configNote + tscOut, err
 	}
 
-	viteOut, err := runBuildCommand(ctx, assessmentDir, util.SandboxedEnv(), filepath.Join(binDir, "vite"), "build")
+	viteOut, err := runBuildCommand(ctx, sb, assessmentDir, util.SandboxedEnv(), filepath.Join(binDir, "vite"), "build")
 
 	out := configNote + tscOut + viteOut
 

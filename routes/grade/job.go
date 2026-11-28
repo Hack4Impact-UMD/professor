@@ -1,6 +1,7 @@
 package grade
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"github.com/Hack4Impact-UMD/professor/builder"
 	"github.com/Hack4Impact-UMD/professor/git"
 	"github.com/Hack4Impact-UMD/professor/playwright"
+	"github.com/Hack4Impact-UMD/professor/sandbox"
 	"github.com/Hack4Impact-UMD/professor/serve"
 	"github.com/Hack4Impact-UMD/professor/util"
 	"golang.org/x/sync/errgroup"
@@ -39,7 +41,7 @@ func (c cloneResult) cleanup() {
 
 const MAX_REPO_SIZE_MB = 10
 
-func cloneWithSizeCheck(path string, dest string, pat string) error {
+func cloneWithSizeCheck(ctx context.Context, sb sandbox.Sandbox, path string, dest string, pat string) error {
 	size, err := git.GetRepoSizeKB(path)
 
 	if err != nil {
@@ -50,23 +52,14 @@ func cloneWithSizeCheck(path string, dest string, pat string) error {
 		return errors.New("repo too large")
 	}
 
-	return git.CloneRepo(path, dest, pat)
+	return git.CloneRepo(ctx, sb, path, dest, pat)
 }
 
-func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string, logger *slog.Logger) (cloneResult, error) {
+func cloneRepos(ctx context.Context, sb sandbox.Sandbox, jobId string, assessmentRepoPath string, testRepoPath string, logger *slog.Logger) (cloneResult, error) {
 	pat := os.Getenv("GITHUB_PAT")
 
-	// Separate temp roots so the untrusted assessment tree and the trusted test
-	// tree are not siblings under a common, predictable parent.
-	assessmentDir, err := os.MkdirTemp("", "job-assessment-*")
-	if err != nil {
-		return cloneResult{}, err
-	}
-	testDir, err := os.MkdirTemp("", "job-tests-*")
-	if err != nil {
-		os.RemoveAll(assessmentDir)
-		return cloneResult{}, err
-	}
+	assessmentDir := fmt.Sprintf("job-assessment-%v", jobId)
+	testDir := fmt.Sprintf("job-tests-%v", jobId)
 
 	result := cloneResult{AssessmentDir: assessmentDir, TestDir: testDir}
 
@@ -75,14 +68,14 @@ func cloneRepos(jobId string, assessmentRepoPath string, testRepoPath string, lo
 	logger.Info("cloning repos", "jobId", jobId, "assessmentRepo", assessmentRepoPath, "testRepo", testRepoPath, "assessmentDir", assessmentDir, "testDir", testDir)
 
 	wg.Go(func() error {
-		if err := cloneWithSizeCheck(assessmentRepoPath, assessmentDir, pat); err != nil {
+		if err := cloneWithSizeCheck(ctx, sb, assessmentRepoPath, assessmentDir, pat); err != nil {
 			logger.Error("assessment clone failed", "jobId", jobId, "repo", assessmentRepoPath, "err", err)
 			return err
 		}
 		return nil
 	})
 	wg.Go(func() error {
-		if err := cloneWithSizeCheck(testRepoPath, testDir, pat); err != nil {
+		if err := cloneWithSizeCheck(ctx, sb, testRepoPath, testDir, pat); err != nil {
 			logger.Error("test repo clone failed", "jobId", jobId, "repo", testRepoPath, "err", err)
 			return err
 		}
@@ -104,22 +97,42 @@ func RunGradingJobLocal(jobId string, assessmentRepoDir string, testRepoDir stri
 	return grade(jobId, assessmentRepoDir, testRepoDir, reporter, logger)
 }
 
-func RunGradingJob(jobId string, assessmentRepoPath string, testRepoPath string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
+func RunGradingJob(ctx context.Context, jobId string, assessmentRepoPath string, testRepoPath string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
 	logger.Info("running grading job", "jobId", jobId)
 	reporter.OnGradeStart(jobId)
 
+	sandboxDir := os.TempDir()
+	mount := []sandbox.MountPoint{
+		sandbox.MountPoint{
+			SourcePath: sandboxDir,
+			DestPath:   sandboxDir,
+			ReadOnly:   false,
+		},
+	}
+
+	var sb sandbox.Sandbox = nil
+	name := fmt.Sprintf("sandbox-%v", jobId)
+	if os.Getenv("DEV") == "true" {
+		dockerSandbox := sandbox.NewDocker(name, "h4i-umd/professor:latest", sandboxDir, mount, false)
+		sb = &dockerSandbox
+	} else {
+		crSandbox := sandbox.NewCloudRun(name, sandboxDir, mount, false)
+		sb = &crSandbox
+	}
+	defer sb.Destroy(ctx)
+
 	reporter.OnCloneStart(jobId, assessmentRepoPath, testRepoPath)
-	clone, err := cloneRepos(jobId, assessmentRepoPath, testRepoPath, logger)
+	clone, err := cloneRepos(ctx, sb, jobId, assessmentRepoPath, testRepoPath, logger)
 	reporter.OnCloneEnd(jobId, assessmentRepoPath, testRepoPath, err)
 	if err != nil {
 		return err
 	}
 	defer clone.cleanup()
 
-	return grade(jobId, clone.AssessmentDir, clone.TestDir, reporter, logger)
+	return grade(ctx, sb, jobId, clone.AssessmentDir, clone.TestDir, reporter, logger)
 }
 
-func installDeps(assessmentDir string, testDir string, logger *slog.Logger) (string, string, error) {
+func installDeps(ctx context.Context, sb sandbox.Sandbox, assessmentDir string, testDir string, logger *slog.Logger) (string, string, error) {
 	dirs := [2]string{assessmentDir, testDir}
 	outs := [2]string{}
 
@@ -127,7 +140,7 @@ func installDeps(assessmentDir string, testDir string, logger *slog.Logger) (str
 	for i, dir := range dirs {
 		wg.Go(func() error {
 			logger.Info("installing deps", "dir", dir)
-			out, err := builder.InstallDeps(dir)
+			out, err := builder.InstallDeps(ctx, sb, dir)
 			outs[i] = out
 			if err != nil {
 				logger.Error("dep install failed", "dir", dir, "output", out, "err", err)
@@ -140,11 +153,11 @@ func installDeps(assessmentDir string, testDir string, logger *slog.Logger) (str
 	return outs[0], outs[1], err
 }
 
-func grade(jobId string, assessmentDir string, testDir string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
+func grade(ctx context.Context, sb sandbox.Sandbox, jobId string, assessmentDir string, testDir string, reporter playwright.GradingJobReporter, logger *slog.Logger) error {
 	logger.Info("installing dependencies", "jobId", jobId)
 	reporter.OnInstallStart(jobId)
 
-	assessmentInstallOut, testInstallOut, err := installDeps(assessmentDir, testDir, logger)
+	assessmentInstallOut, testInstallOut, err := installDeps(ctx, sb, assessmentDir, testDir, logger)
 	reporter.OnInstallEnd(jobId, fmt.Sprintf("Assessment:\n%s\nTests:\n%s", assessmentInstallOut, testInstallOut), err)
 	if err != nil {
 		return err
@@ -153,7 +166,7 @@ func grade(jobId string, assessmentDir string, testDir string, reporter playwrig
 
 	logger.Info("building assessment", "jobId", jobId)
 	reporter.OnBuildStart(jobId)
-	buildOut, err := builder.BuildAssessment(assessmentDir, testDir)
+	buildOut, err := builder.BuildAssessment(ctx, sb, assessmentDir, testDir)
 	reporter.OnBuildEnd(jobId, buildOut, err)
 	if err != nil {
 		logger.Error("build failed", "jobId", jobId, "output", buildOut, "err", err)
@@ -161,7 +174,7 @@ func grade(jobId string, assessmentDir string, testDir string, reporter playwrig
 	}
 	logger.Info("assessment built", "jobId", jobId)
 
-	port, stop, err := serve.ServeAssessment(filepath.Join(assessmentDir, "dist"))
+	port, stop, err := serve.ServeAssessment(ctx, sb, filepath.Join(assessmentDir, "dist"))
 	if err != nil {
 		reporter.OnServe(jobId, err)
 		logger.Error("serve failed", "jobId", jobId, "err", err)
@@ -170,7 +183,7 @@ func grade(jobId string, assessmentDir string, testDir string, reporter playwrig
 	defer stop()
 	logger.Info("serving assessment", "jobId", jobId, "port", port)
 
-	if err := util.WaitForPort(port, 5*time.Second); err != nil {
+	if err := util.WaitForPort(ctx, sb, port, 5*time.Second); err != nil {
 		reporter.OnServe(jobId, err)
 		logger.Error("file server did not respond within timeout", "jobId", jobId, "port", port)
 		return err
@@ -179,7 +192,7 @@ func grade(jobId string, assessmentDir string, testDir string, reporter playwrig
 
 	reporter.OnServe(jobId, nil)
 
-	if err := playwright.RunPlaywrightTests(jobId, testDir, port, reporter, logger); err != nil {
+	if err := playwright.RunPlaywrightTests(ctx, sb, jobId, testDir, port, reporter, logger); err != nil {
 		logger.Error("playwright tests failed", "jobId", jobId, "err", err)
 		return err
 	}
