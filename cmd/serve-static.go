@@ -11,10 +11,11 @@ import (
 var serveStaticPort int = -1
 
 var serveStatic = &cobra.Command{
-	Use:   "serve-static",
-	Short: "Start the HTTP SPA server",
-	Long:  `Starts the HTTP SPA server that served the built assessment SPA files. Used within the grading container`,
-	RunE:  runServeStatic,
+	Use:          "serve-static",
+	Short:        "Start the HTTP SPA server",
+	Long:         `Starts the HTTP SPA server that served the built assessment SPA files. Used within the grading container`,
+	RunE:         runServeStatic,
+	SilenceUsage: true,
 }
 
 func init() {
