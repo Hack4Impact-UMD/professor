@@ -1,8 +1,11 @@
 package sandbox
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +20,7 @@ func TestBuildDockerStartArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		sb       DockerSandbox
+		cwd      string // host cwd; defaults to sb.Dir
 		wantRest []string
 		wantEnv  []string
 	}{
@@ -76,10 +80,54 @@ func TestBuildDockerStartArgs(t *testing.T) {
 			},
 			wantEnv: []string{"CI=1", "PATH=/usr/bin:/bin"},
 		},
+		{
+			name: "host cwd outside dir is mounted read-only",
+			sb:   DockerSandbox{Name: "sb-1", Image: "img", Dir: "/workspace"},
+			cwd:  "/host/cwd",
+			wantRest: []string{
+				"run", "--detach", "--init", "--name", "sb-1", "-w", "/workspace",
+				"--mount", "type=bind,src=/workspace,dst=/workspace,readonly",
+				"--mount", "type=bind,src=/host/cwd,dst=/host/cwd,readonly",
+				"--network", "none",
+				"img", "sleep", "infinity",
+			},
+		},
+		{
+			name: "host cwd of / is not mounted",
+			sb:   DockerSandbox{Name: "sb-1", Image: "img", Dir: "/workspace"},
+			cwd:  "/",
+			wantRest: []string{
+				"run", "--detach", "--init", "--name", "sb-1", "-w", "/workspace",
+				"--mount", "type=bind,src=/workspace,dst=/workspace,readonly",
+				"--network", "none",
+				"img", "sleep", "infinity",
+			},
+		},
+		{
+			name: "caller mount at host cwd replaces the cwd mount",
+			sb: DockerSandbox{
+				Name:   "sb-1",
+				Image:  "img",
+				Dir:    "/workspace",
+				Mounts: []MountPoint{{SourcePath: "/elsewhere", DestPath: "/host/cwd"}},
+			},
+			cwd: "/host/cwd",
+			wantRest: []string{
+				"run", "--detach", "--init", "--name", "sb-1", "-w", "/workspace",
+				"--mount", "type=bind,src=/workspace,dst=/workspace,readonly",
+				"--mount", "type=bind,src=/elsewhere,dst=/host/cwd",
+				"--network", "none",
+				"img", "sleep", "infinity",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rest, env := splitEnv(t, buildDockerStartArgs(&tt.sb))
+			cwd := tt.cwd
+			if cwd == "" {
+				cwd = tt.sb.Dir
+			}
+			rest, env := splitEnv(t, buildDockerStartArgs(&tt.sb, cwd))
 			if !reflect.DeepEqual(rest, tt.wantRest) {
 				t.Errorf("args (excluding env) = %q, want %q", rest, tt.wantRest)
 			}
@@ -96,29 +144,38 @@ func TestBuildDockerExecArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		cmd      SandboxCommand
+		cwd      string
 		wantRest []string
 		wantEnv  []string
 	}{
 		{
-			name:     "defaults to sandbox dir",
+			name:     "no dir defaults to host cwd",
 			cmd:      SandboxCommand{Args: []string{"echo", "hi"}},
-			wantRest: []string{"exec", "-w", "/workspace", "sb-1", "echo", "hi"},
+			cwd:      "/host/cwd",
+			wantRest: []string{"exec", "-w", "/host/cwd", "sb-1", "echo", "hi"},
 		},
 		{
-			name:     "command dir overrides sandbox dir",
+			name:     "command dir overrides host cwd",
 			cmd:      SandboxCommand{Args: []string{"ls"}, Dir: "/tmp"},
+			cwd:      "/host/cwd",
 			wantRest: []string{"exec", "-w", "/tmp", "sb-1", "ls"},
+		},
+		{
+			name:     "no dir and unknown cwd omits -w",
+			cmd:      SandboxCommand{Args: []string{"ls"}},
+			wantRest: []string{"exec", "sb-1", "ls"},
 		},
 		{
 			name:     "env is passed as KEY=VALUE",
 			cmd:      SandboxCommand{Args: []string{"env"}, Env: map[string]string{"CI": "1"}},
-			wantRest: []string{"exec", "-w", "/workspace", "sb-1", "env"},
+			cwd:      "/host/cwd",
+			wantRest: []string{"exec", "-w", "/host/cwd", "sb-1", "env"},
 			wantEnv:  []string{"CI=1"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := buildDockerExecArgs(sb, &tt.cmd)
+			args := buildDockerExecArgs(sb, &tt.cmd, tt.cwd)
 
 			// The user's command comes after the container name; only parse flags before it.
 			nameIdx := slices.Index(args, sb.Name)
@@ -178,7 +235,9 @@ func startDockerSandbox(t *testing.T, sb *DockerSandbox) {
 		t.Fatalf("Start() error = %v", err)
 	}
 	t.Cleanup(func() {
-		if err := sb.Destroy(); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := sb.Destroy(ctx); err != nil {
 			t.Errorf("Destroy() error = %v", err)
 		}
 	})
@@ -211,13 +270,19 @@ func TestDockerSandbox_Lifecycle(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	t.Run("working dir defaults to sandbox dir", func(t *testing.T) {
-		out, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"pwd"}})
+	// The test's cwd is this package's dir, which is outside workDir, so this
+	// also checks that the host cwd gets mounted.
+	t.Run("no dir defaults to host cwd", func(t *testing.T) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"sh", "-c", "pwd && test -f docker_test.go"}})
 		if err != nil {
 			t.Fatalf("Exec() error = %v: %s", err, out)
 		}
-		if got := strings.TrimSpace(string(out)); got != workDir {
-			t.Errorf("pwd = %q, want %q", got, workDir)
+		if got := strings.TrimSpace(string(out)); got != cwd {
+			t.Errorf("pwd = %q, want %q", got, cwd)
 		}
 	})
 
@@ -245,20 +310,20 @@ func TestDockerSandbox_Lifecycle(t *testing.T) {
 	})
 
 	t.Run("working dir is readable but not writable", func(t *testing.T) {
-		out, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"cat", "input.txt"}})
+		out, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"cat", "input.txt"}, Dir: workDir})
 		if err != nil {
 			t.Fatalf("Exec() error = %v: %s", err, out)
 		}
 		if got := string(out); got != "from-host" {
 			t.Errorf("cat = %q, want from-host", got)
 		}
-		if out, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"touch", "new"}}); err == nil {
+		if out, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"touch", "new"}, Dir: workDir}); err == nil {
 			t.Errorf("write to read-only working dir succeeded: %s", out)
 		}
 	})
 
 	t.Run("writable mount nested in working dir", func(t *testing.T) {
-		if out, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"sh", "-c", "echo result > out/result.txt"}}); err != nil {
+		if out, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"sh", "-c", "echo result > out/result.txt"}, Dir: workDir}); err != nil {
 			t.Fatalf("Exec() error = %v: %s", err, out)
 		}
 		got, err := os.ReadFile(filepath.Join(outDir, "result.txt"))
@@ -310,7 +375,7 @@ func TestDockerSandbox_BackgroundExecSharesLoopback(t *testing.T) {
 
 	serveErr := make(chan error, 1)
 	go func() {
-		_, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"httpd", "-f", "-p", "127.0.0.1:4173", "-h", "www"}})
+		_, err := sb.Exec(ctx, &SandboxCommand{Args: []string{"httpd", "-f", "-p", "127.0.0.1:4173", "-h", "www"}, Dir: workDir})
 		serveErr <- err
 	}()
 
@@ -333,4 +398,130 @@ func TestDockerSandbox_BackgroundExecSharesLoopback(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+// drainPiped reads both ExecPipe streams to EOF concurrently, then calls wait,
+// the way callers are supposed to.
+func drainPiped(t *testing.T, stdout, stderr io.Reader, wait func() error) (string, string, error) {
+	t.Helper()
+	errCh := make(chan []byte, 1)
+	go func() {
+		b, _ := io.ReadAll(stderr)
+		errCh <- b
+	}()
+	outBytes, err := io.ReadAll(stdout)
+	if err != nil {
+		t.Fatalf("reading stdout: %v", err)
+	}
+	errBytes := <-errCh
+	return string(outBytes), string(errBytes), wait()
+}
+
+func TestDockerSandbox_ExecPipe(t *testing.T) {
+	image := dockerTestImage(t)
+
+	sb := NewDocker(fmt.Sprintf("professor-test-%d", time.Now().UnixNano()), image, t.TempDir(), nil, false)
+	startDockerSandbox(t, &sb)
+
+	t.Run("stdout and stderr are separate", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		stdout, stderr, wait, err := sb.ExecPipe(ctx, &SandboxCommand{
+			Args: []string{"sh", "-c", "echo to-stdout; echo to-stderr >&2"},
+		})
+		if err != nil {
+			t.Fatalf("ExecPipe() error = %v", err)
+		}
+
+		out, errOut, err := drainPiped(t, stdout, stderr, wait)
+		if err != nil {
+			t.Errorf("wait() error = %v", err)
+		}
+		if got := strings.TrimSpace(out); got != "to-stdout" {
+			t.Errorf("stdout = %q, want to-stdout", got)
+		}
+		if got := strings.TrimSpace(errOut); got != "to-stderr" {
+			t.Errorf("stderr = %q, want to-stderr", got)
+		}
+	})
+
+	t.Run("wait reports a non-zero exit", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		stdout, stderr, wait, err := sb.ExecPipe(ctx, &SandboxCommand{
+			Args: []string{"sh", "-c", "echo partial; exit 3"},
+		})
+		if err != nil {
+			t.Fatalf("ExecPipe() error = %v", err)
+		}
+
+		out, _, err := drainPiped(t, stdout, stderr, wait)
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("wait() error = %v, want *exec.ExitError", err)
+		}
+		// Only check non-zero: the Cloud Run CLI collapses every failure to 1.
+		if exitErr.ExitCode() == 0 {
+			t.Errorf("exit code = 0, want non-zero")
+		}
+		if got := strings.TrimSpace(out); got != "partial" {
+			t.Errorf("stdout = %q, want partial (output before the failure)", got)
+		}
+	})
+
+	t.Run("wait reports context cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		stdout, stderr, wait, err := sb.ExecPipe(ctx, &SandboxCommand{Args: []string{"sleep", "30"}})
+		if err != nil {
+			cancel()
+			t.Fatalf("ExecPipe() error = %v", err)
+		}
+		cancel()
+
+		start := time.Now()
+		if _, _, err := drainPiped(t, stdout, stderr, wait); err == nil {
+			t.Error("wait() error = nil, want an error after cancellation")
+		}
+		if elapsed := time.Since(start); elapsed > 10*time.Second {
+			t.Errorf("cancelled command took %s to stop", elapsed)
+		}
+	})
+
+	// The Playwright reporter's NDJSON events have to arrive while tests are
+	// still running, not all at once when the command exits.
+	t.Run("output streams before the command exits", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		stdout, stderr, wait, err := sb.ExecPipe(ctx, &SandboxCommand{
+			Args: []string{"sh", "-c", "echo first; sleep 2; echo second"},
+		})
+		if err != nil {
+			t.Fatalf("ExecPipe() error = %v", err)
+		}
+
+		r := bufio.NewReader(stdout)
+		line, err := r.ReadString('\n')
+		if err != nil {
+			t.Fatalf("reading first line: %v", err)
+		}
+		if got := strings.TrimSpace(line); got != "first" {
+			t.Errorf("first line = %q, want first", got)
+		}
+		if elapsed := time.Since(start); elapsed > 1500*time.Millisecond {
+			t.Errorf("first line took %s; output is not streaming", elapsed)
+		}
+
+		rest, _, err := drainPiped(t, r, stderr, wait)
+		if err != nil {
+			t.Errorf("wait() error = %v", err)
+		}
+		if got := strings.TrimSpace(rest); got != "second" {
+			t.Errorf("rest of stdout = %q, want second", got)
+		}
+	})
 }

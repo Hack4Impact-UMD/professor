@@ -3,6 +3,8 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"slices"
 )
@@ -29,11 +31,27 @@ func NewDocker(name string, image string, dir string, mounts []MountPoint, netAc
 	}
 }
 
-func buildDockerStartArgs(s *DockerSandbox) []string {
+// hostCwd is the host's working directory, or "" if it can't be determined.
+func hostCwd() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return cwd
+}
+
+func buildDockerStartArgs(s *DockerSandbox, cwd string) []string {
 	args := []string{"run", "--detach", "--init", "--name", s.Name, "-w", s.Dir}
 
-	if !slices.ContainsFunc(s.Mounts, func(m MountPoint) bool { return m.DestPath == s.Dir }) {
+	hasMountAt := func(dst string) bool {
+		return slices.ContainsFunc(s.Mounts, func(m MountPoint) bool { return m.DestPath == dst })
+	}
+	if !hasMountAt(s.Dir) {
 		args = append(args, (&MountPoint{SourcePath: s.Dir, DestPath: s.Dir, ReadOnly: true}).Arg()...)
+	}
+
+	if cwd != "" && cwd != "/" && cwd != s.Dir && !hasMountAt(cwd) {
+		args = append(args, (&MountPoint{SourcePath: cwd, DestPath: cwd, ReadOnly: true}).Arg()...)
 	}
 
 	for _, mount := range s.Mounts {
@@ -50,12 +68,15 @@ func buildDockerStartArgs(s *DockerSandbox) []string {
 	return args
 }
 
-func buildDockerExecArgs(s *DockerSandbox, cmd *SandboxCommand) []string {
+func buildDockerExecArgs(s *DockerSandbox, cmd *SandboxCommand, cwd string) []string {
 	dir := cmd.Dir
 	if dir == "" {
-		dir = s.Dir
+		dir = cwd
 	}
-	args := []string{"exec", "-w", dir}
+	args := []string{"exec"}
+	if dir != "" {
+		args = append(args, "-w", dir)
+	}
 	for k, v := range cmd.Env {
 		args = append(args, "-e", fmt.Sprintf("%v=%v", k, v))
 	}
@@ -65,7 +86,7 @@ func buildDockerExecArgs(s *DockerSandbox, cmd *SandboxCommand) []string {
 }
 
 func (s *DockerSandbox) Start(ctx context.Context) error {
-	out, err := exec.CommandContext(ctx, "docker", buildDockerStartArgs(s)...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, "docker", buildDockerStartArgs(s, hostCwd())...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("docker sandbox start (%s): %w: %s", s.Name, err, out)
 	}
@@ -73,11 +94,15 @@ func (s *DockerSandbox) Start(ctx context.Context) error {
 }
 
 func (s *DockerSandbox) Exec(ctx context.Context, cmd *SandboxCommand) ([]byte, error) {
-	return exec.CommandContext(ctx, "docker", buildDockerExecArgs(s, cmd)...).CombinedOutput()
+	return exec.CommandContext(ctx, "docker", buildDockerExecArgs(s, cmd, hostCwd())...).CombinedOutput()
 }
 
-func (s *DockerSandbox) Destroy() error {
-	out, err := exec.Command("docker", "rm", "--force", s.Name).CombinedOutput()
+func (s *DockerSandbox) ExecPipe(ctx context.Context, cmd *SandboxCommand) (stdout io.ReadCloser, stderr io.ReadCloser, wait func() error, err error) {
+	return startPiped(exec.CommandContext(ctx, "docker", buildDockerExecArgs(s, cmd, hostCwd())...))
+}
+
+func (s *DockerSandbox) Destroy(ctx context.Context) error {
+	out, err := exec.CommandContext(ctx, "docker", "rm", "--force", s.Name).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("docker sandbox destroy (%s): %w: %s", s.Name, err, out)
 	}

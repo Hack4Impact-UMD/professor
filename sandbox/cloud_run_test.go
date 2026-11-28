@@ -131,12 +131,12 @@ func TestBuildExecArgs(t *testing.T) {
 		wantEnv  []string
 	}{
 		{
-			name:     "defaults to sandbox dir",
+			name:     "no dir omits -w so the CLI uses the host cwd",
 			cmd:      SandboxCommand{Args: []string{"echo", "hi"}},
-			wantRest: []string{"exec", "--stdin=false", "-w", "/workspace", "sb-1", "--", "echo", "hi"},
+			wantRest: []string{"exec", "--stdin=false", "sb-1", "--", "echo", "hi"},
 		},
 		{
-			name:     "command dir overrides sandbox dir",
+			name:     "command dir is passed with -w",
 			cmd:      SandboxCommand{Args: []string{"ls"}, Dir: "/tmp"},
 			wantRest: []string{"exec", "--stdin=false", "-w", "/tmp", "sb-1", "--", "ls"},
 		},
@@ -144,7 +144,7 @@ func TestBuildExecArgs(t *testing.T) {
 			name: "command args are passed through verbatim",
 			cmd:  SandboxCommand{Args: []string{"bash", "-c", "echo $HOME && -w --env"}},
 			wantRest: []string{
-				"exec", "--stdin=false", "-w", "/workspace", "sb-1", "--",
+				"exec", "--stdin=false", "sb-1", "--",
 				"bash", "-c", "echo $HOME && -w --env",
 			},
 		},
@@ -154,7 +154,7 @@ func TestBuildExecArgs(t *testing.T) {
 				Args: []string{"env"},
 				Env:  map[string]string{"PATH": "/usr/bin:/bin", "CI": "1"},
 			},
-			wantRest: []string{"exec", "--stdin=false", "-w", "/workspace", "sb-1", "--", "env"},
+			wantRest: []string{"exec", "--stdin=false", "sb-1", "--", "env"},
 			wantEnv:  []string{"CI=1", "PATH=/usr/bin:/bin"},
 		},
 	}

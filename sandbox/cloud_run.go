@@ -3,6 +3,7 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 )
 
@@ -41,11 +42,11 @@ func buildStartArgs(s *CloudRunSandbox) []string {
 }
 
 func buildExecArgs(s *CloudRunSandbox, cmd *SandboxCommand) []string {
-	dir := cmd.Dir
-	if dir == "" {
-		dir = s.Dir
+	args := []string{"exec", "--stdin=false"}
+	// Without -w, the CLI runs the command in the host's cwd.
+	if cmd.Dir != "" {
+		args = append(args, "-w", cmd.Dir)
 	}
-	args := []string{"exec", "--stdin=false", "-w", dir}
 	for k, v := range cmd.Env {
 		args = append(args, "--env", fmt.Sprintf("%v=%v", k, v))
 	}
@@ -65,7 +66,7 @@ func NewCloudRun(name string, dir string, mounts []MountPoint, netAccess bool) C
 
 func (s *CloudRunSandbox) Start(ctx context.Context) error {
 	args := buildStartArgs(s)
-	out, err := exec.Command("sandbox", args...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, "sandbox", args...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("sandbox start (%s): %w: %s", s.Name, err, out)
 	}
@@ -75,11 +76,15 @@ func (s *CloudRunSandbox) Start(ctx context.Context) error {
 
 func (s *CloudRunSandbox) Exec(ctx context.Context, cmd *SandboxCommand) ([]byte, error) {
 	args := buildExecArgs(s, cmd)
-	return exec.Command("sandbox", args...).CombinedOutput()
+	return exec.CommandContext(ctx, "sandbox", args...).CombinedOutput()
 }
 
-func (s *CloudRunSandbox) Destroy() error {
-	out, err := exec.Command("sandbox", "delete", "--force", s.Name).CombinedOutput()
+func (s *CloudRunSandbox) ExecPipe(ctx context.Context, cmd *SandboxCommand) (stdout io.ReadCloser, stderr io.ReadCloser, wait func() error, err error) {
+	return startPiped(exec.CommandContext(ctx, "sandbox", buildExecArgs(s, cmd)...))
+}
+
+func (s *CloudRunSandbox) Destroy(ctx context.Context) error {
+	out, err := exec.CommandContext(ctx, "sandbox", "delete", "--force", s.Name).CombinedOutput()
 
 	if err != nil {
 		return fmt.Errorf("sandbox destory (%s): %w: %s", s.Name, err, out)
