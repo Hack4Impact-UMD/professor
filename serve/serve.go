@@ -58,3 +58,12 @@ func ServeAssessment(distDir string) (int, func(), error) {
 
 	return port, stop, nil
 }
+
+func ServeAssessmentBlocking(port int, distDir string) error {
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: http.FileServer(spaFS{http.Dir(distDir)}),
+	}
+	err := server.ListenAndServe()
+	return err
+}
