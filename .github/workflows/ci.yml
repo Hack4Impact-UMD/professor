@@ -145,7 +145,14 @@ jobs:
           PROJECT_ID=professor-ci-test
           EOF
 
+      # The sandbox package's DockerSandbox tests use the runner's Docker daemon.
+      # Pull the image up front so a registry hiccup shows up as its own step.
+      - name: Pull sandbox test image
+        run: docker pull busybox:1.37
+
       - name: go test
+        env:
+          REQUIRE_DOCKER_TESTS: "true"
         run: go test ./...
 
   terraform-fmt:
